@@ -1,6 +1,6 @@
-"""AI Report Builder v1.3 — Aplicación Web.
+"""AI Report Builder v1.6 — Aplicación Web.
 
-Cambios v1.3:
+Cambios v1.6:
 - Selector de habilidades (podés incluir/excluir cada una)
 - Promedio diario correcto (total / días con actividad)
 - Slide de Datos Generales rediseñada (2 filas, tarjetas grandes centradas)
@@ -85,6 +85,10 @@ st.markdown("""
     <p>Hospital Alemán · Productividad del Contact Center</p>
 </div>""", unsafe_allow_html=True)
 
+# Version banner — lets you confirm at a glance which version is deployed
+APP_VERSION = "1.6"
+st.caption(f"Versión {APP_VERSION} · Incluye: llamadas salientes · evolución mensual · top 10 habilidades")
+
 with st.sidebar:
     st.markdown("### ⚙️ Configuración")
     st.selectbox("Tipo de reporte", ["Productividad del Contact Center"])
@@ -98,7 +102,7 @@ with st.sidebar:
         "5. Descargá el PPTX"
     )
     st.divider()
-    st.caption("v1.3 · Selección + anexos + prom. correcto")
+    st.caption(f"v{APP_VERSION} · Selección + anexos + salientes + tendencia")
 
 # ======================================================================
 # Step 1: Upload
