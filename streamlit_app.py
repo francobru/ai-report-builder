@@ -26,7 +26,8 @@ from app.data_loader.skill_mapper import (
 from app.kpi_engine.calculator import compute_kpis, compute_variation
 from app.chart_engine.renderer import (
     chart_daily_distribution, chart_donut,
-    chart_grouped_bar_line, chart_horizontal_bars, save_chart,
+    chart_grouped_bar_line, chart_horizontal_bars,
+    chart_vertical_bars, save_chart,
 )
 from app.chart_engine.chart_styles import apply_global_style
 from app.plugins.contact_center.plugin import ContactCenterPlugin
@@ -113,6 +114,10 @@ with col_prev:
     st.markdown("**📁 Mes anterior** (opcional, para variaciones)")
     previous_files = st.file_uploader("CSVs del mes anterior", type=["csv"],
                                        accept_multiple_files=True, key="previous")
+
+st.markdown("**📞 Llamadas salientes** (opcional, archivo aparte)")
+outbound_file = st.file_uploader("CSV de llamadas salientes", type=["csv"],
+                                  accept_multiple_files=False, key="outbound")
 
 if not current_files:
     st.info("👆 Subí los archivos CSV del mes que querés reportar.")
@@ -452,6 +457,86 @@ if top_skills:
     chart_images["skill_volume_top10"] = str(save_chart(fig, chart_dir / "skill_top10.png"))
     plt.close(fig)
 
+# ---- Monthly trend (evolución mensual) ----
+from app.data_loader.monthly_history import get_trend, add_month
+from app.data_loader.skill_mapper import extract_period as _extract_period_full
+
+# Determine current month/year from the period label
+_period_info = None
+for uf in current_files:
+    _period_info = _extract_period_full(uf.name)
+    if _period_info:
+        break
+
+monthly_trend_data = []
+if _period_info:
+    _, cur_month, cur_year = _period_info
+    # Save current month's totals to history (so it accumulates over time)
+    add_month(cur_year, cur_month,
+              recibidas=int(global_kpis["recibidas"]["value"]),
+              atendidas=int(global_kpis["atendidas"]["value"]),
+              nivel_atencion=global_kpis["nivel_atencion"]["value"])
+    # Build trend up to current month
+    trend_records = get_trend(cur_year, cur_month)
+    monthly_trend_data = [
+        {"month_name": r.month_name, "recibidas": r.recibidas,
+         "atendidas": r.atendidas, "nivel_atencion": r.nivel_atencion}
+        for r in trend_records
+    ]
+    if len(monthly_trend_data) >= 2:
+        fig = chart_grouped_bar_line(
+            [r["month_name"] for r in monthly_trend_data],
+            [r["recibidas"] for r in monthly_trend_data],
+            [r["atendidas"] for r in monthly_trend_data],
+            [r["nivel_atencion"] for r in monthly_trend_data],
+            title=f"Evolución mensual {cur_year}",
+            y_na_min=60.0)
+        chart_images["monthly_evolution"] = str(save_chart(fig, chart_dir / "monthly.png"))
+        plt.close(fig)
+
+# ---- Outbound calls (llamadas salientes) ----
+outbound_data = None
+if outbound_file is not None:
+    from app.data_loader.outbound_loader import (
+        load_outbound_csv, aggregate_outbound, count_rotaciones_am,
+    )
+    try:
+        content = outbound_file.read(); outbound_file.seek(0)
+        tmp = tempfile.NamedTemporaryFile(suffix=".csv", delete=False)
+        tmp.write(content); tmp.close()
+        ob_df = load_outbound_csv(Path(tmp.name))
+        ob_agg = aggregate_outbound(ob_df)
+
+        outbound_data = {
+            "total": ob_agg["total"],
+            "rotaciones": count_rotaciones_am(ob_df),
+            "solo_operadores": 0,  # refined later with business rule
+        }
+
+        # Chart: distribution by result
+        if ob_agg["by_result"]:
+            results = list(ob_agg["by_result"].keys())
+            counts = list(ob_agg["by_result"].values())
+            fig = chart_vertical_bars(results, counts, title="Distribución por resultado")
+            chart_images["outbound_result"] = str(save_chart(fig, chart_dir / "ob_result.png"))
+            plt.close(fig)
+
+        # Chart: daily distribution
+        if len(ob_agg["daily"]) > 0:
+            daily_ob = ob_agg["daily"]
+            month_names = {1:"ene",2:"feb",3:"mar",4:"abr",5:"may",6:"jun",
+                           7:"jul",8:"ago",9:"sep",10:"oct",11:"nov",12:"dic"}
+            labels = [f"{pd.Timestamp(d).day}-{month_names.get(pd.Timestamp(d).month,'?')}"
+                      for d in daily_ob["date"]]
+            fig = chart_vertical_bars(labels, daily_ob["count"].tolist(),
+                                      title="Distribución diaria — Llamadas salientes")
+            chart_images["outbound_daily"] = str(save_chart(fig, chart_dir / "ob_daily.png"))
+            plt.close(fig)
+
+        st.success(f"📞 Llamadas salientes cargadas: {ob_agg['total']:,} llamadas".replace(",", "."))
+    except Exception as e:
+        st.error(f"Error al procesar llamadas salientes: {e}")
+
 # Preview
 with st.expander("👁️ Vista previa de gráficos", expanded=False):
     if "daily_all" in chart_images:
@@ -525,6 +610,8 @@ if generate_btn:
             skill_table=pptx_skills,
             chart_images=chart_images,
             annexes=annexes,
+            outbound=outbound_data,
+            monthly_trend=monthly_trend_data if monthly_trend_data else None,
         )
 
     st.success(f"✅ Reporte generado exitosamente ({len(pptx_campaigns)} campañas, {len(annexes)} anexos)")

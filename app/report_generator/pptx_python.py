@@ -580,6 +580,106 @@ def _build_annex_daily_table(prs, campaign_name, daily_rows, page_num, total_pag
 # Main generator function
 # ======================================================================
 
+def _build_outbound_slide(prs, outbound, chart_images, page_num, total_pages, period):
+    """Slide: Llamadas Salientes with KPIs + result distribution + daily chart."""
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    subtitle = f"Productividad del Contact Center · {period}"
+    _add_header_bar(slide, "Llamadas Salientes", subtitle, period)
+    _add_footer(slide, page_num, total_pages)
+    _add_section_title(slide, "Resumen de gestión de llamadas salientes", 0.9)
+
+    # KPI cards
+    total = outbound.get("total", 0)
+    rotaciones = outbound.get("rotaciones", 0)
+    solo_op = outbound.get("solo_operadores", 0)
+
+    def _fmt(n):
+        return f"{int(n):,}".replace(",", ".")
+
+    _add_kpi_card(slide, 0.5, 1.4, 3.8, "Total Llamadas Salientes", _fmt(total), None, DARK_NAVY)
+    _add_kpi_card(slide, 4.6, 1.4, 3.8, "Rotaciones AM", _fmt(rotaciones), None, MEDIUM_BLUE)
+    _add_kpi_card(slide, 8.7, 1.4, 3.8, "Solo Operadores AM", _fmt(solo_op), None, GREEN)
+
+    # Two charts side by side
+    if chart_images.get("outbound_result"):
+        _add_chart_image(slide, chart_images["outbound_result"], 0.3, 2.7, 6.2, 4.0)
+    if chart_images.get("outbound_daily"):
+        _add_chart_image(slide, chart_images["outbound_daily"], 6.7, 2.7, 6.3, 4.0)
+
+
+def _build_monthly_trend_slide(prs, trend_records, chart_path, page_num, total_pages, period):
+    """Slide: Evolución Mensual with a table + trend chart."""
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    subtitle = f"Productividad del Contact Center · {period}"
+    _add_header_bar(slide, "Evolución Mensual", subtitle, period)
+    _add_footer(slide, page_num, total_pages)
+    _add_section_title(slide, "Tendencia mensual del año", 0.9)
+
+    if not trend_records:
+        _add_textbox(slide, Inches(0.7), Inches(1.5), Inches(10), Inches(0.4),
+                     "Sin datos históricos disponibles", font_size=12,
+                     color=TEXT_GRAY, italic=True)
+        return
+
+    # Compact table at top
+    n_months = len(trend_records)
+    headers = ["", *[r["month_name"] for r in trend_records]]
+    rows_spec = [
+        ("Recibidas", [f"{r['recibidas']:,}".replace(",", ".") for r in trend_records]),
+        ("Atendidas", [f"{r['atendidas']:,}".replace(",", ".") for r in trend_records]),
+        ("Nivel de Atención", [f"{r['nivel_atencion']:.1f}%".replace(".", ",") for r in trend_records]),
+    ]
+
+    n_cols = n_months + 1
+    table_w = min(1.2 + n_months * 2.0, 12.3)
+    table_x = (13.333 - table_w) / 2
+    shape = slide.shapes.add_table(4, n_cols, Inches(table_x), Inches(1.35),
+                                   Inches(table_w), Inches(1.4))
+    table = shape.table
+
+    # Header
+    for j, h in enumerate(headers):
+        cell = table.cell(0, j)
+        cell.text = h
+        for p in cell.text_frame.paragraphs:
+            p.font.size = Pt(10)
+            p.font.bold = True
+            p.font.name = FONT_NAME
+            p.font.color.rgb = WHITE
+            p.alignment = PP_ALIGN.CENTER
+        cell.fill.solid()
+        cell.fill.fore_color.rgb = DARK_NAVY
+
+    # Rows
+    for i, (label, values) in enumerate(rows_spec):
+        cell = table.cell(i + 1, 0)
+        cell.text = label
+        for p in cell.text_frame.paragraphs:
+            p.font.size = Pt(10)
+            p.font.bold = True
+            p.font.name = FONT_NAME
+            p.alignment = PP_ALIGN.LEFT
+        cell.fill.solid()
+        cell.fill.fore_color.rgb = LIGHT_GRAY
+        for j, val in enumerate(values):
+            c = table.cell(i + 1, j + 1)
+            c.text = val
+            for p in c.text_frame.paragraphs:
+                p.font.size = Pt(10)
+                p.font.name = FONT_NAME
+                p.alignment = PP_ALIGN.CENTER
+            c.fill.solid()
+            c.fill.fore_color.rgb = WHITE
+
+    # Chart below the table
+    if chart_path:
+        _add_chart_image(slide, chart_path, 0.5, 3.0, 12.3, 3.7)
+
+
+# ======================================================================
+# Main generator function
+# ======================================================================
+
 def generate_pptx_report(
     period: str,
     global_kpis: dict[str, str],
@@ -588,6 +688,8 @@ def generate_pptx_report(
     skill_table: list[dict[str, str]],
     chart_images: dict[str, Any],
     annexes: list[dict[str, Any]] | None = None,
+    outbound: dict[str, Any] | None = None,
+    monthly_trend: list[dict[str, Any]] | None = None,
 ) -> bytes:
     """Generate a complete PPTX report and return it as bytes.
 
@@ -649,9 +751,30 @@ def generate_pptx_report(
             camp.get("chart_path"), 5 + i, period
         )
 
-    # N. Skill table
-    skill_page = 5 + len(campaign_data)
-    _build_skill_table_slide(prs, skill_table, skill_page, period)
+    page = 5 + len(campaign_data)
+
+    # Monthly trend (evolución mensual)
+    if monthly_trend:
+        _build_monthly_trend_slide(prs, monthly_trend,
+                                   chart_images.get("monthly_evolution"),
+                                   page, total_pages, period)
+        page += 1
+
+    # Outbound calls (llamadas salientes)
+    if outbound:
+        _build_outbound_slide(prs, outbound, chart_images, page, total_pages, period)
+        page += 1
+
+    # Top 10 skills chart
+    if chart_images.get("skill_volume_top10"):
+        _build_chart_slide(prs, "Análisis de Habilidades — Top 10",
+                           "Top 10 habilidades por volumen de llamadas",
+                           chart_images["skill_volume_top10"], page, period)
+        page += 1
+
+    # Skill detail table
+    _build_skill_table_slide(prs, skill_table, page, period)
+    skill_page = page
 
     # Annexes: one slide per campaign with daily table
     for i, annex in enumerate(annexes):
