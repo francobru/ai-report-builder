@@ -1,0 +1,55 @@
+# ===========================================================
+# AI Report Builder — Global Configuration
+# ===========================================================
+
+app:
+  name: "AI Report Builder"
+  version: "1.0.0"
+  language: "es"
+
+# Paths (relative to project root)
+paths:
+  templates: "templates"
+  output: "output"
+  historical_data: "data/historical"
+
+# CSV parsing defaults (Tecnovoz format)
+csv:
+  separator: ";"
+  decimal: ","
+  encoding: "utf-8"
+  date_format: "%d/%m/%Y"
+
+# AI Engine
+ai:
+  provider: "anthropic"
+  model: "claude-sonnet-4-6"
+  max_tokens: 2000
+  temperature: 0.3
+  language: "es"
+
+# Chart styling — these values are FIXED and must never change
+# between months. They replicate the Tecnovoz/HA report design.
+charts:
+  colors:
+    recibidas: "#1B3A5C"       # Dark navy blue
+    atendidas: "#5B9BD5"       # Medium blue
+    nivel_atencion: "#4CAF50"  # Green line
+    abandono: "#E74C3C"        # Red accent
+    background: "#FFFFFF"
+  fonts:
+    family: "Calibri"
+    title_size: 14
+    label_size: 10
+    tick_size: 9
+  figure:
+    dpi: 200
+    bar_width: 0.35
+
+# Report styling
+report:
+  header_color: "#1B3A5C"      # Dark navy for header bars
+  accent_color: "#4CAF50"      # Green accent for positive
+  negative_color: "#E74C3C"    # Red for negative variation
+  font_family: "Calibri"
+  page_footer_left: "Hospital Alemán · Fuente: Tecnovoz"
