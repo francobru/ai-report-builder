@@ -1,6 +1,6 @@
-"""AI Report Builder v1.6 — Aplicación Web.
+"""AI Report Builder v1.7 — Aplicación Web.
 
-Cambios v1.6:
+Cambios v1.7:
 - Selector de habilidades (podés incluir/excluir cada una)
 - Promedio diario correcto (total / días con actividad)
 - Slide de Datos Generales rediseñada (2 filas, tarjetas grandes centradas)
@@ -86,8 +86,8 @@ st.markdown("""
 </div>""", unsafe_allow_html=True)
 
 # Version banner — lets you confirm at a glance which version is deployed
-APP_VERSION = "1.6"
-st.caption(f"Versión {APP_VERSION} · Incluye: llamadas salientes · evolución mensual · top 10 habilidades")
+APP_VERSION = "1.7"
+st.caption(f"Versión {APP_VERSION} · Incluye: salida PDF · resumen con IA · anexo de habilidades")
 
 with st.sidebar:
     st.markdown("### ⚙️ Configuración")
@@ -100,6 +100,18 @@ with st.sidebar:
         "3. **Seleccioná** las habilidades a incluir\n"
         "4. Revisá los KPIs\n"
         "5. Descargá el PPTX"
+    )
+    st.divider()
+    st.markdown("### 🤖 Resumen con IA")
+    st.caption("Opcional. Genera resumen ejecutivo y conclusiones.")
+    _default_key = ""
+    try:
+        _default_key = st.secrets.get("ANTHROPIC_API_KEY", "")
+    except Exception:
+        pass
+    api_key_input = st.text_input(
+        "API key de Anthropic", value=_default_key, type="password",
+        help="Se obtiene en console.anthropic.com. Si no la cargás, el reporte se genera igual pero sin los textos de IA.",
     )
     st.divider()
     st.caption(f"v{APP_VERSION} · Selección + anexos + salientes + tendencia")
@@ -229,6 +241,7 @@ global_ng_kpis = compute_kpis(all_no_gipfel, kpi_defs) if len(all_no_gipfel) > 0
 
 # Variations
 global_variations = {}
+global_ng_variations = {}
 if prev_dfs:
     prev_selected = {s: df for s, df in prev_dfs.items() if s in current_dfs}
     if prev_selected:
@@ -236,6 +249,12 @@ if prev_dfs:
                               ignore_index=True)
         prev_kpis = compute_kpis(all_prev, kpi_defs)
         global_variations = compute_variation(global_kpis, prev_kpis)
+
+        # Same comparison but excluding Gipfel skills, for the "sin Gipfel" slide
+        prev_ng = all_prev[~all_prev["_skill"].str.lower().isin(GIPFEL_SKILLS)]
+        if global_ng_kpis is not None and len(prev_ng) > 0:
+            prev_ng_kpis = compute_kpis(prev_ng, kpi_defs)
+            global_ng_variations = compute_variation(global_ng_kpis, prev_ng_kpis)
 
 # Per-campaign KPIs + variations
 classification = {}
@@ -541,6 +560,44 @@ if outbound_file is not None:
     except Exception as e:
         st.error(f"Error al procesar llamadas salientes: {e}")
 
+# ---- AI: executive summary and conclusions ----
+ai_texts = {}
+if api_key_input:
+    from app.ai_engine.client import AIEngine, build_kpi_summary
+
+    with st.expander("🤖 Resumen ejecutivo y conclusiones (IA)", expanded=True):
+        if st.button("Generar textos con IA", use_container_width=True):
+            engine = AIEngine(api_key=api_key_input)
+            if not engine.is_available:
+                st.error("No se pudo conectar con la IA. Revisá la API key.")
+            else:
+                prompts = plugin.get_prompts()
+                kpi_summary = build_kpi_summary(global_kpis, global_variations)
+                # Add per-campaign lines so the model has the full picture
+                camp_lines = [
+                    f"- {c}: recibidas {campaign_kpis[c]['recibidas']['formatted']}, "
+                    f"atendidas {campaign_kpis[c]['atendidas']['formatted']}, "
+                    f"NA {campaign_kpis[c]['nivel_atencion']['formatted']}"
+                    for c in CAMPAIGN_ORDER if c in campaign_kpis
+                ]
+                full_summary = kpi_summary + "\n\nPor campaña:\n" + "\n".join(camp_lines)
+
+                with st.spinner("Redactando..."):
+                    resumen = engine.generate_executive_summary(prompts, full_summary, current_period)
+                    conclusiones = engine.generate_conclusions(prompts, full_summary, current_period)
+                st.session_state["ai_resumen"] = resumen
+                st.session_state["ai_conclusiones"] = conclusiones
+
+        # Editable so you can adjust before it goes into the report
+        if "ai_resumen" in st.session_state:
+            st.markdown("**Resumen ejecutivo**")
+            ai_texts["resumen"] = st.text_area("resumen", st.session_state["ai_resumen"],
+                                                height=140, label_visibility="collapsed")
+            st.markdown("**Conclusiones**")
+            ai_texts["conclusiones"] = st.text_area("conclusiones", st.session_state["ai_conclusiones"],
+                                                     height=180, label_visibility="collapsed")
+            st.caption("Podés editar los textos antes de generar el reporte.")
+
 # Preview
 with st.expander("👁️ Vista previa de gráficos", expanded=False):
     if "daily_all" in chart_images:
@@ -570,7 +627,8 @@ if generate_btn:
         if global_ng_kpis:
             pptx_campaigns.append({
                 "name": "Todas las Campañas (sin Gipfel)", "is_all": True,
-                "kpis": fmt(global_ng_kpis), "variations": {},
+                "kpis": fmt(global_ng_kpis),
+                "variations": fmt_var(global_ng_variations),
                 "chart_path": chart_images.get("daily_all_no_gipfel", ""),
             })
         for camp_name in CAMPAIGN_ORDER:
@@ -606,6 +664,23 @@ if generate_btn:
                     "daily_rows": build_annex_rows(daily_by_campaign[camp_name]),
                 })
 
+        # Footnote for the donut (campaigns excluded due to low share)
+        excluded = [c for c in ("Agendas", "Camp HA") if c in campaign_kpis]
+        donut_note = None
+        if excluded and camp_sorted:
+            total_all = sum(campaign_kpis[c]["recibidas"]["value"] for c in camp_sorted)
+            parts = []
+            for c in excluded:
+                share = campaign_kpis[c]["recibidas"]["value"] / total_all * 100 if total_all else 0
+                label = "Agendas Médicas" if c == "Agendas" else c
+                parts.append(f"{label} ({share:.2f}%".replace(".", ",") + ")")
+            donut_note = ("Nota: " + " y ".join(parts) +
+                          " no figuran en el gráfico de participación debido a su baja representación.")
+
+        # Skill → campaign reference table
+        skills_ref = [{"skill": s, "campaign": find_campaign(s)}
+                      for s in sorted(current_dfs.keys())]
+
         pptx_bytes = generate_pptx_report(
             period=current_period,
             global_kpis=fmt(global_kpis),
@@ -616,14 +691,42 @@ if generate_btn:
             annexes=annexes,
             outbound=outbound_data,
             monthly_trend=monthly_trend_data if monthly_trend_data else None,
+            donut_footnote=donut_note,
+            skills_reference=skills_ref,
+        )
+
+        # Same content, PDF layout
+        from app.report_generator.pdf_generator import generate_pdf_report
+        pdf_bytes = generate_pdf_report(
+            period=current_period,
+            global_kpis=fmt(global_kpis),
+            global_variations=fmt_var(global_variations),
+            campaign_data=pptx_campaigns,
+            skill_table=pptx_skills,
+            chart_images=chart_images,
+            annexes=annexes,
+            outbound=outbound_data,
+            monthly_trend=monthly_trend_data if monthly_trend_data else None,
+            donut_footnote=donut_note,
+            skills_reference=skills_ref,
         )
 
     st.success(f"✅ Reporte generado exitosamente ({len(pptx_campaigns)} campañas, {len(annexes)} anexos)")
     slug = current_period.replace(" ", "_")
-    st.download_button(
-        label="📥 Descargar reporte PPTX",
-        data=pptx_bytes,
-        file_name=f"Reporte_CCenter_{slug}.pptx",
-        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        type="primary", use_container_width=True,
-    )
+    col_pptx, col_pdf = st.columns(2)
+    with col_pptx:
+        st.download_button(
+            label="📥 Descargar PPTX",
+            data=pptx_bytes,
+            file_name=f"Reporte_CCenter_{slug}.pptx",
+            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            type="primary", use_container_width=True,
+        )
+    with col_pdf:
+        st.download_button(
+            label="📄 Descargar PDF",
+            data=pdf_bytes,
+            file_name=f"Reporte_CCenter_{slug}.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+        )

@@ -361,7 +361,7 @@ def _build_chart_slide(prs, title, section, chart_path, page_num, period):
 
 
 def _build_dual_chart_slide(prs, title, section, chart_left, chart_right,
-                              page_num, period):
+                              page_num, period, footnote=None):
     """Build a slide with two charts side by side (e.g., campaign analysis)."""
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     subtitle = f"Productividad del Contact Center · {period}"
@@ -372,6 +372,12 @@ def _build_dual_chart_slide(prs, title, section, chart_left, chart_right,
         _add_chart_image(slide, chart_left, 0.2, 1.4, 6.5, 4.8)
     if chart_right:
         _add_chart_image(slide, chart_right, 6.8, 1.4, 6.0, 4.8)
+    if footnote:
+        # Light grey note box at the bottom, like the original report
+        _add_rect(slide, Inches(0.5), Inches(6.25), Inches(12.3), Inches(0.5),
+                  fill_color=LIGHT_GRAY)
+        _add_textbox(slide, Inches(0.7), Inches(6.33), Inches(12.0), Inches(0.4),
+                     footnote, font_size=9, italic=True, color=TEXT_GRAY)
 
 
 def _build_skill_table_slide(prs, skill_table, page_num, period):
@@ -588,17 +594,22 @@ def _build_outbound_slide(prs, outbound, chart_images, page_num, total_pages, pe
     _add_footer(slide, page_num, total_pages)
     _add_section_title(slide, "Resumen de gestión de llamadas salientes", 0.9)
 
-    # KPI cards
+    # KPI cards. Rotaciones AM and Solo Operadores AM are left BLANK on purpose:
+    # those figures come from the supervisors' cancellation registry, so the
+    # user fills them in manually in PowerPoint.
     total = outbound.get("total", 0)
-    rotaciones = outbound.get("rotaciones", 0)
-    solo_op = outbound.get("solo_operadores", 0)
 
     def _fmt(n):
         return f"{int(n):,}".replace(",", ".")
 
     _add_kpi_card(slide, 0.5, 1.4, 3.8, "Total Llamadas Salientes", _fmt(total), None, DARK_NAVY)
-    _add_kpi_card(slide, 4.6, 1.4, 3.8, "Rotaciones AM", _fmt(rotaciones), None, MEDIUM_BLUE)
-    _add_kpi_card(slide, 8.7, 1.4, 3.8, "Solo Operadores AM", _fmt(solo_op), None, GREEN)
+    _add_kpi_card(slide, 4.6, 1.4, 3.8, "Rotaciones AM", "", None, MEDIUM_BLUE)
+    _add_kpi_card(slide, 8.7, 1.4, 3.8, "Solo Operadores AM", "", None, GREEN)
+
+    # Hint that these two are filled manually
+    _add_textbox(slide, 4.6 * 914400, int(2.42 * 914400), int(7.9 * 914400), int(0.25 * 914400),
+                 "Completar manualmente — fuente: registro de cancelaciones de supervisores",
+                 font_size=8, italic=True, color=TEXT_GRAY, alignment=PP_ALIGN.CENTER)
 
     # Two charts side by side
     if chart_images.get("outbound_result"):
@@ -680,6 +691,74 @@ def _build_monthly_trend_slide(prs, trend_records, chart_path, page_num, total_p
 # Main generator function
 # ======================================================================
 
+def _build_skills_reference_annex(prs, skills_reference, page_num, total_pages, period):
+    """Annex slide: reference table mapping each skill to its campaign.
+
+    skills_reference: list of {"skill": ..., "campaign": ...}
+    Rendered in up to 3 side-by-side columns so all 19+ skills fit.
+    """
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    subtitle = f"Productividad del Contact Center · {period}"
+    _add_header_bar(slide, "Anexo — Referencia de Habilidades", subtitle, period)
+    _add_footer(slide, page_num, total_pages)
+    _add_section_title(slide, "Habilidades por campaña", 0.9)
+
+    if not skills_reference:
+        _add_textbox(slide, Inches(0.7), Inches(1.5), Inches(10), Inches(0.4),
+                     "Sin datos disponibles", font_size=12, color=TEXT_GRAY, italic=True)
+        return
+
+    rows = [[s["skill"], s["campaign"]] for s in skills_reference]
+    headers = ["Habilidad", "Campaña"]
+
+    n = len(rows)
+    n_cols_layout = 1 if n <= 14 else (2 if n <= 28 else 3)
+    per_col = -(-n // n_cols_layout)
+    chunks = [rows[i * per_col:(i + 1) * per_col] for i in range(n_cols_layout)]
+    chunks = [c for c in chunks if c]
+
+    table_w = 3.9 if n_cols_layout == 3 else (5.6 if n_cols_layout == 2 else 6.5)
+    gap = 0.35
+    total_w = table_w * len(chunks) + gap * (len(chunks) - 1)
+    start_x = (13.333 - total_w) / 2
+    max_len = max(len(c) for c in chunks)
+    row_h = 0.26
+    table_h = min((max_len + 1) * row_h, 5.3)
+
+    for idx, chunk in enumerate(chunks):
+        padded = list(chunk) + [["", ""]] * (max_len - len(chunk))
+        x = start_x + idx * (table_w + gap)
+        shape = slide.shapes.add_table(max_len + 1, 2, Inches(x), Inches(1.4),
+                                       Inches(table_w), Inches(table_h))
+        table = shape.table
+        table.columns[0].width = Inches(table_w * 0.55)
+        table.columns[1].width = Inches(table_w * 0.45)
+
+        for j, h in enumerate(headers):
+            cell = table.cell(0, j)
+            cell.text = h
+            for p in cell.text_frame.paragraphs:
+                p.font.size = Pt(9)
+                p.font.bold = True
+                p.font.color.rgb = WHITE
+                p.font.name = FONT_NAME
+                p.alignment = PP_ALIGN.CENTER
+            cell.fill.solid()
+            cell.fill.fore_color.rgb = DARK_NAVY
+
+        for i, row in enumerate(padded):
+            bg = LIGHT_GRAY if i % 2 == 0 else WHITE
+            for j, val in enumerate(row):
+                cell = table.cell(i + 1, j)
+                cell.text = str(val)
+                cell.fill.solid()
+                cell.fill.fore_color.rgb = bg
+                for p in cell.text_frame.paragraphs:
+                    p.font.size = Pt(8)
+                    p.font.name = FONT_NAME
+                    p.alignment = PP_ALIGN.LEFT
+
+
 def generate_pptx_report(
     period: str,
     global_kpis: dict[str, str],
@@ -690,6 +769,8 @@ def generate_pptx_report(
     annexes: list[dict[str, Any]] | None = None,
     outbound: dict[str, Any] | None = None,
     monthly_trend: list[dict[str, Any]] | None = None,
+    donut_footnote: str | None = None,
+    skills_reference: list[dict[str, str]] | None = None,
 ) -> bytes:
     """Generate a complete PPTX report and return it as bytes.
 
@@ -742,7 +823,8 @@ def generate_pptx_report(
                             "Volumen y participación por campaña",
                             chart_images.get("campaign_volume"),
                             chart_images.get("campaign_share"),
-                            4, period)
+                            4, period,
+                            footnote=donut_footnote)
 
     # 5+. Individual campaigns
     for i, camp in enumerate(campaign_data):
@@ -786,6 +868,12 @@ def generate_pptx_report(
             total_pages,
             period,
         )
+
+    # Final annex: skill → campaign reference table
+    if skills_reference:
+        _build_skills_reference_annex(prs, skills_reference,
+                                      skill_page + 1 + len(annexes),
+                                      total_pages, period)
 
     # Save to bytes
     buffer = io.BytesIO()
