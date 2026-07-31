@@ -1,262 +1,285 @@
-"""AI Report Builder — Main entry point.
+"""Contact Center plugin — Productividad del Contact Center.
 
-Supports two modes:
-  1. CLI mode (for testing):  python main.py --files *.csv --output report.pptx
-  2. GUI mode (production):   python main.py  (launches PySide6 window)
+Defines the complete data contract for the monthly Contact Center report
+produced for Hospital Alemán with data sourced from Tecnovoz.
 """
 
 from __future__ import annotations
 
-import argparse
-import sys
 from pathlib import Path
 
-# Ensure project root is on sys.path
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-from app.config import settings
-from app.core.pipeline import PipelineContext, ReportPipeline
-from app.core.plugin_registry import registry
-from app.data_loader.csv_loader import load_csv, load_multiple_csvs
-from app.data_loader.validator import validate
-from app.kpi_engine.calculator import compute_kpis, compute_variation
-from app.chart_engine.renderer import (
-    chart_daily_distribution,
-    chart_donut,
-    chart_grouped_bar_line,
-    chart_horizontal_bars,
-    save_chart,
+from app.core.plugin_registry import (
+    ChartDefinition,
+    ColumnSpec,
+    DataSchema,
+    KPIDefinition,
+    PromptConfig,
+    ReportPlugin,
 )
 
 
-def _detect_period(ctx: PipelineContext) -> str:
-    """Detect the period label from the loaded data."""
-    import pandas as pd
-    month_names = {
-        1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
-        5: "Mayo", 6: "Junio", 7: "Julio", 8: "Agosto",
-        9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre",
-    }
-    for _name, df in ctx.raw_dataframes.items():
-        if "date" in df.columns:
-            dates = df["date"].dropna()
-            if not dates.empty:
-                month = dates.iloc[0].month
-                year = dates.iloc[0].year
-                return f"{month_names.get(month, '?')} {year}"
-    return "Período desconocido"
+class ContactCenterPlugin(ReportPlugin):
 
-
-# ======================================================================
-# Pipeline stages
-# ======================================================================
-
-def stage_load_data(ctx: PipelineContext) -> PipelineContext:
-    """Stage 1: Load all CSV files."""
-    schema = ctx.plugin.get_schema()
-    ctx.raw_dataframes = load_multiple_csvs(ctx.input_files, schema=schema)
-    print(f"  Loaded {len(ctx.raw_dataframes)} file(s)")
-    return ctx
-
-
-def stage_validate(ctx: PipelineContext) -> PipelineContext:
-    """Stage 2: Validate all loaded data."""
-    schema = ctx.plugin.get_schema()
-    for name, df in ctx.raw_dataframes.items():
-        result = validate(df, schema, source_name=name)
-        if not result.is_valid:
-            ctx.validation_errors.extend(result.errors)
-        ctx.validation_warnings.extend(result.warnings)
-        print(f"  {name}: {result.summary}")
-
-    if ctx.validation_errors:
-        print(f"  ⚠ {len(ctx.validation_errors)} error(s) found")
-    return ctx
-
-
-def stage_combine_data(ctx: PipelineContext) -> PipelineContext:
-    """Stage 3: Combine files and group by campaign."""
-    import pandas as pd
-
-    # Combine all into one master DataFrame
-    all_dfs = []
-    for name, df in ctx.raw_dataframes.items():
-        df = df.copy()
-        df["_skill_name"] = name
-        all_dfs.append(df)
-
-    if all_dfs:
-        ctx.combined_data = pd.concat(all_dfs, ignore_index=True)
-    else:
-        ctx.combined_data = pd.DataFrame()
-
-    # Group by campaign using plugin mapping
-    mapping = ctx.plugin.get_campaign_mapping()
-    for campaign_name, skill_stems in mapping.items():
-        # Match skill stems case-insensitively
-        skill_lower = [s.lower() for s in skill_stems]
-        mask = ctx.combined_data["_skill_name"].str.lower().isin(skill_lower)
-        campaign_df = ctx.combined_data[mask]
-        if not campaign_df.empty:
-            ctx.campaign_data[campaign_name] = campaign_df
-
-    # Detect period
-    ctx.period_label = _detect_period(ctx)
-    print(f"  Period: {ctx.period_label}")
-    print(f"  Campaigns found: {list(ctx.campaign_data.keys())}")
-    return ctx
-
-
-def stage_compute_kpis(ctx: PipelineContext) -> PipelineContext:
-    """Stage 4: Compute KPIs for global and per-campaign."""
-    kpi_defs = ctx.plugin.get_kpis()
-
-    # Global KPIs (all data combined)
-    if ctx.combined_data is not None and not ctx.combined_data.empty:
-        ctx.kpi_results["global"] = compute_kpis(ctx.combined_data, kpi_defs)
-
-    # Per-campaign KPIs
-    for camp_name, camp_df in ctx.campaign_data.items():
-        ctx.campaign_kpis[camp_name] = compute_kpis(camp_df, kpi_defs)
-
-    # Per-skill KPIs (for the skills detail table)
-    skill_table = []
-    for name, df in ctx.raw_dataframes.items():
-        sk_kpis = compute_kpis(df, kpi_defs)
-        skill_table.append({
-            "name": name,
-            "recibidas": sk_kpis["recibidas"]["formatted"],
-            "atendidas": sk_kpis["atendidas"]["formatted"],
-            "na": sk_kpis["nivel_atencion"]["formatted"],
-            "conversacion": sk_kpis["tiempo_conversacion"]["formatted"],
-            "demora": sk_kpis["tiempo_demora"]["formatted"],
-            "abandono": sk_kpis["tiempo_abandono"]["formatted"],
-        })
-    skill_table.sort(key=lambda s: float(
-        s["recibidas"].replace(".", "").replace(",", ".")
-    ), reverse=True)
-    ctx.kpi_results["skill_table"] = skill_table
-
-    print(f"  Computed KPIs for {len(ctx.campaign_kpis)} campaigns + global")
-    return ctx
-
-
-def stage_generate_charts(ctx: PipelineContext) -> PipelineContext:
-    """Stage 5: Generate all charts as PNG images."""
-    chart_dir = Path("output/charts")
-    chart_dir.mkdir(parents=True, exist_ok=True)
-
-    # Daily distribution per skill/campaign
-    for name, df in ctx.raw_dataframes.items():
-        if "date" not in df.columns:
-            continue
-        fig = chart_daily_distribution(df, title=f"Distribución diaria — {name}")
-        path = save_chart(fig, chart_dir / f"daily_{name}.png")
-        ctx.chart_images[f"daily_{name}"] = path
-
-    # Weekday distribution (all data)
-    if ctx.combined_data is not None and "date" in ctx.combined_data.columns:
-        import pandas as pd
-        df_all = ctx.combined_data.copy()
-        df_all["weekday"] = df_all["date"].dt.dayofweek
-        wk = df_all.groupby("weekday").agg(
-            rec=("TOTALCALLS", "sum"),
-            att=("TRANSFER", "sum"),
-        ).reindex(range(7), fill_value=0)
-        wk["na"] = (wk["att"] / wk["rec"].replace(0, 1) * 100).round(2)
-
-        day_labels = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"]
-        fig = chart_grouped_bar_line(
-            labels=day_labels,
-            recibidas=wk["rec"].tolist(),
-            atendidas=wk["att"].tolist(),
-            nivel_atencion=wk["na"].tolist(),
-            title="Distribución por día de semana",
-        )
-        path = save_chart(fig, chart_dir / "weekday_distribution.png")
-        ctx.chart_images["weekday_distribution"] = path
-
-    print(f"  Generated {len(ctx.chart_images)} charts")
-    return ctx
-
-
-def stage_generate_report(ctx: PipelineContext) -> PipelineContext:
-    """Stage 6: Assemble the final PPTX."""
-    from app.report_generator.pptx_generator import generate_pptx
-
-    output_dir = Path("output")
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    period_slug = ctx.period_label.replace(" ", "_")
-    output_path = output_dir / f"Reporte_CCenter_{period_slug}.pptx"
-
-    ctx.output_path = generate_pptx(ctx, output_path)
-    print(f"  Report saved: {ctx.output_path}")
-    return ctx
-
-
-# ======================================================================
-# CLI
-# ======================================================================
-
-def run_cli(args: argparse.Namespace) -> None:
-    """Run the pipeline in CLI mode."""
-
-    # Discover plugins
-    registry.discover()
-
-    plugin_name = args.plugin or "contact_center"
-    plugin = registry.get(plugin_name)
-
-    files = [Path(f) for f in args.files]
-    for f in files:
-        if not f.exists():
-            print(f"Error: file not found: {f}")
-            sys.exit(1)
-
-    ctx = PipelineContext(
-        plugin=plugin,
-        input_files=files,
-        output_format=args.format,
+    name = "contact_center"
+    display_name = "Productividad del Contact Center"
+    description = (
+        "Reporte mensual de productividad del Contact Center: "
+        "volumen de llamadas, nivel de atención y tiempos operativos."
     )
 
-    pipeline = ReportPipeline()
-    pipeline.add_stage("Cargando archivos", stage_load_data)
-    pipeline.add_stage("Validando datos", stage_validate)
-    pipeline.add_stage("Combinando datos", stage_combine_data)
-    pipeline.add_stage("Calculando KPIs", stage_compute_kpis)
-    pipeline.add_stage("Generando gráficos", stage_generate_charts)
+    # ------------------------------------------------------------------
+    # Schema
+    # ------------------------------------------------------------------
 
-    if args.format == "pptx":
-        pipeline.add_stage("Generando reporte PPTX", stage_generate_report)
+    def get_schema(self) -> DataSchema:
+        return DataSchema(
+            columns=[
+                ColumnSpec("NUMDAY", dtype="object", required=True, description="Fecha DD/MM/YYYY"),
+                ColumnSpec("TRANSFER", dtype="float64", required=True, description="Llamadas atendidas"),
+                ColumnSpec("NOTRANSFER", dtype="float64", required=True, description="Llamadas no atendidas"),
+                ColumnSpec("TOTALCALLS", dtype="float64", required=True, description="Total llamadas recibidas"),
+                ColumnSpec("PCTATT", dtype="float64", required=True, description="Nivel de atención (%)"),
+                ColumnSpec("AVGCONNWAIT", dtype="object", required=True, description="Demora promedio (HH:MM:SS)"),
+                ColumnSpec("AVGABNWAIT", dtype="object", required=True, description="Abandono promedio (HH:MM:SS)"),
+                ColumnSpec("AVGTALKTIME", dtype="object", required=True, description="Conversación promedio (HH:MM:SS)"),
+                ColumnSpec("SVCLEVEL", dtype="float64", required=False, description="Nivel de servicio (%)"),
+                ColumnSpec("SLCALLS", dtype="float64", required=False, description="Llamadas dentro de SL"),
+                ColumnSpec("LOGDATE", dtype="float64", required=True, description="Fecha YYYYMMDD"),
+            ],
+            separator=";",
+            decimal=",",
+            encoding="utf-8",
+            date_column="LOGDATE",
+            has_total_row=True,
+        )
 
-    def on_progress(step: int, total: int, label: str) -> None:
-        print(f"\n[{step}/{total}] {label}")
+    # ------------------------------------------------------------------
+    # KPIs
+    # ------------------------------------------------------------------
 
-    ctx = pipeline.run(ctx, on_progress=on_progress)
+    def get_kpis(self) -> list[KPIDefinition]:
+        return [
+            KPIDefinition(
+                id="recibidas",
+                label="Recibidas",
+                source_column="TOTALCALLS",
+                aggregation="sum",
+                format_str="{:,.0f}",
+                description="Total de llamadas recibidas en el período",
+            ),
+            KPIDefinition(
+                id="atendidas",
+                label="Atendidas",
+                source_column="TRANSFER",
+                aggregation="sum",
+                format_str="{:,.0f}",
+                description="Total de llamadas atendidas",
+            ),
+            KPIDefinition(
+                id="promedio_recibidas",
+                label="Prom. Recibidas",
+                source_column="TOTALCALLS",
+                aggregation="mean",
+                format_str="{:,.0f}",
+                description="Promedio diario de llamadas recibidas",
+            ),
+            KPIDefinition(
+                id="promedio_atendidas",
+                label="Prom. Atendidas",
+                source_column="TRANSFER",
+                aggregation="mean",
+                format_str="{:,.0f}",
+                description="Promedio diario de llamadas atendidas",
+            ),
+            KPIDefinition(
+                id="nivel_atencion",
+                label="Nivel de Atención",
+                unit="%",
+                aggregation="custom",
+                format_str="{:.2f}%",
+                description="Atendidas / Recibidas × 100",
+            ),
+            KPIDefinition(
+                id="tiempo_conversacion",
+                label="Conversación",
+                unit="HH:MM:SS",
+                source_column="AVGTALKTIME",
+                aggregation="mean_time",
+                format_str="{}",
+                description="Tiempo promedio de conversación",
+            ),
+            KPIDefinition(
+                id="tiempo_demora",
+                label="Demora",
+                unit="HH:MM:SS",
+                source_column="AVGCONNWAIT",
+                aggregation="mean_time",
+                format_str="{}",
+                description="Tiempo promedio de espera antes de ser atendido",
+            ),
+            KPIDefinition(
+                id="tiempo_abandono",
+                label="Abandono",
+                unit="HH:MM:SS",
+                source_column="AVGABNWAIT",
+                aggregation="mean_time",
+                format_str="{}",
+                description="Tiempo promedio antes de que el llamante abandone",
+            ),
+        ]
 
-    if ctx.validation_errors:
-        print(f"\n⚠ Warnings: {len(ctx.validation_errors)} validation errors")
+    # ------------------------------------------------------------------
+    # Charts
+    # ------------------------------------------------------------------
 
-    print(f"\n✓ Pipeline complete!")
-    if ctx.output_path:
-        print(f"  Output: {ctx.output_path}")
+    def get_charts(self) -> list[ChartDefinition]:
+        return [
+            ChartDefinition(
+                id="daily_distribution",
+                chart_type="bar_line",
+                title="Distribución diaria — {campaign}",
+                x_column="date",
+                y_columns=["TOTALCALLS", "TRANSFER"],
+                line_column="PCTATT",
+                description="Barras recibidas/atendidas + línea nivel de atención por día",
+            ),
+            ChartDefinition(
+                id="weekday_distribution",
+                chart_type="grouped_bar_line",
+                title="Distribución por día de semana",
+                description="Agregado por día de semana (lun–dom) con línea NA",
+            ),
+            ChartDefinition(
+                id="campaign_volume",
+                chart_type="horizontal_bar",
+                title="Distribución por campaña",
+                description="Barras horizontales recibidas/atendidas por campaña",
+            ),
+            ChartDefinition(
+                id="campaign_share",
+                chart_type="donut",
+                title="Participación por campaña",
+                description="Donut con % de participación de cada campaña",
+            ),
+            ChartDefinition(
+                id="monthly_evolution",
+                chart_type="grouped_bar_line",
+                title="Evolución mensual {year}",
+                description="Tendencia mensual Ene–Dic con barras y línea NA",
+            ),
+            ChartDefinition(
+                id="skill_volume_top10",
+                chart_type="horizontal_bar",
+                title="Top 10 habilidades por volumen de llamadas recibidas",
+                description="Barras horizontales recibidas/atendidas top 10 habilidades",
+            ),
+            ChartDefinition(
+                id="outbound_result",
+                chart_type="vertical_bar",
+                title="Distribución por resultado",
+                description="Llamadas salientes por resultado (Conectado, No llama, etc.)",
+            ),
+            ChartDefinition(
+                id="outbound_daily",
+                chart_type="vertical_bar",
+                title="Distribución diaria — Llamadas salientes",
+                description="Volumen diario de llamadas salientes",
+            ),
+        ]
+
+    # ------------------------------------------------------------------
+    # Campaign ↔ Skill mapping
+    # ------------------------------------------------------------------
+
+    def get_campaign_mapping(self) -> dict[str, list[str]]:
+        """Map campaign names to the skill CSV file stems they contain.
+
+        The stems are matched case-insensitively against the uploaded filenames.
+        """
+        return {
+            "Turnos": [
+                "Donacion",
+                "0800_onco",
+                "Osde_210",
+                "TelePerfomance",
+                "TelePerf_Cons",
+                "TelePerf_PM_Cons",
+                "Turno_Consulta",
+                "Turnos_Estudios",
+                "Turnos_PM_Consulta",
+                "Turnos_PM_Estudios",
+                "Gipfel_PM",
+                "Gipfel_Cober",
+            ],
+            "Conmutador": [
+                "Busqueda_Personas",
+                "Sede_Caballito",
+                "Camilleros",
+                "Conmutador",
+                "RechazoComm",
+            ],
+            "Plan Médico": [
+                "PM_Consultas",
+                "0800_coca_cola",
+            ],
+            "Portal": [
+                "Portal_Digital",
+                "Portal_Paciente",
+            ],
+            "Agendas": [
+                "Agendas_medicas",
+            ],
+            "Camp HA": [
+                "Camp_HA",
+            ],
+        }
+
+    # ------------------------------------------------------------------
+    # AI prompts
+    # ------------------------------------------------------------------
+
+    def get_prompts(self) -> PromptConfig:
+        return PromptConfig(
+            executive_summary=(
+                "Sos un analista de datos del Hospital Alemán. "
+                "Redactá un resumen ejecutivo de máximo 4 oraciones sobre la "
+                "productividad del Contact Center del mes de {period}. "
+                "Basate exclusivamente en los siguientes KPIs:\n\n{kpi_summary}\n\n"
+                "Mencioná las variaciones más relevantes respecto al mes anterior. "
+                "Usá tono profesional y neutro. No inventes datos."
+            ),
+            conclusions=(
+                "En base a los datos del Contact Center de {period}:\n\n"
+                "{kpi_summary}\n\n"
+                "Redactá 3 a 5 conclusiones breves y concretas. "
+                "Si algún indicador está por debajo del objetivo (NA < 85%), "
+                "mencionalo explícitamente. No inventes datos."
+            ),
+            recommendations=(
+                "En base a las conclusiones del Contact Center de {period}:\n\n"
+                "{conclusions}\n\n"
+                "Proponé 3 a 5 recomendaciones accionables para mejorar "
+                "los indicadores. Sé específico y práctico."
+            ),
+            anomaly_detection=(
+                "Analizá los siguientes datos diarios del Contact Center "
+                "de {period} e identificá cualquier anomalía, pico inusual, "
+                "o patrón fuera de lo normal:\n\n{daily_data}\n\n"
+                "Si no hay anomalías, indicalo. No inventes datos."
+            ),
+        )
+
+    # ------------------------------------------------------------------
+    # Template
+    # ------------------------------------------------------------------
+
+    def get_template_path(self) -> Path | None:
+        templates_dir = Path(__file__).parent / "templates"
+        pptx = templates_dir / "template.pptx"
+        if pptx.exists():
+            return pptx
+        return None
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="AI Report Builder")
-    parser.add_argument("--files", nargs="+", help="Input CSV/Excel files")
-    parser.add_argument("--plugin", default="contact_center", help="Report plugin name")
-    parser.add_argument("--format", choices=["pdf", "pptx"], default="pptx")
-
-    args = parser.parse_args()
-
-    if args.files:
-        run_cli(args)
-    else:
-        print("No files specified. GUI mode not yet implemented.")
-        print("Usage: python main.py --files file1.csv file2.csv --format pptx")
-
-
-if __name__ == "__main__":
-    main()
+# Module-level instance for auto-registration
+plugin_instance = ContactCenterPlugin()
