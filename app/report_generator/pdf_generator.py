@@ -91,6 +91,66 @@ def _text(c, x_in, y_top_in, text, size=10, bold=False, italic=False,
         c.drawString(x, y, str(text))
 
 
+def _text_in_box(c, x_in, y_top_in, w_in, h_in, text, size=10, bold=False,
+                 italic=False, color=TEXT_DARK, align="center", pad_in=0.09):
+    """Draw a line of text vertically centred inside a box.
+
+    Cap height for Helvetica is ~0.7 * size, so the baseline sits
+    0.35 * size below the vertical centre of the box.
+    """
+    if text is None or text == "":
+        return
+    font = FONT_BOLD if bold else (FONT_ITALIC if italic else FONT)
+    c.setFont(font, size)
+    c.setFillColor(color)
+    baseline = _y(y_top_in + h_in / 2) - 0.35 * size
+
+    if align == "center":
+        c.drawCentredString(_in(x_in) + _in(w_in) / 2, baseline, str(text))
+    elif align == "right":
+        c.drawRightString(_in(x_in + w_in - pad_in), baseline, str(text))
+    else:
+        c.drawString(_in(x_in + pad_in), baseline, str(text))
+
+
+def _arrow(c, x_center_in, y_center_in, up: bool, color, size=7):
+    """Draw a small filled triangle (Helvetica has no arrow glyphs)."""
+    half = size / 2.0
+    cx = _in(x_center_in)
+    cy = _y(y_center_in)
+    c.setFillColor(color)
+    path = c.beginPath()
+    if up:
+        path.moveTo(cx, cy + half)
+        path.lineTo(cx - half, cy - half)
+        path.lineTo(cx + half, cy - half)
+    else:
+        path.moveTo(cx, cy - half)
+        path.lineTo(cx - half, cy + half)
+        path.lineTo(cx + half, cy + half)
+    path.close()
+    c.drawPath(path, fill=1, stroke=0)
+
+
+def _variation(c, x_in, y_top_in, w_in, h_in, variation, size=9):
+    """Draw an arrow + percentage, centred inside a box."""
+    if not variation or str(variation).strip() in ("", "-"):
+        return
+    txt = str(variation).replace("\u25b2", "").replace("\u25bc", "").strip()
+    up = "\u25b2" in str(variation)
+    color = GREEN if up else RED
+    c.setFont(FONT_BOLD, size)
+    text_w = c.stringWidth(txt, FONT_BOLD, size)
+    gap = 4.0
+    total_w = text_w + size * 0.7 + gap
+    left = _in(x_in) + (_in(w_in) - total_w) / 2
+    y_center = y_top_in + h_in / 2
+
+    _arrow(c, (left + size * 0.35) / 72, y_center, up, color, size=size * 0.8)
+    c.setFillColor(color)
+    c.drawString(left + size * 0.7 + gap, _y(y_center) - 0.35 * size, txt)
+
+
 def _image(c, img_source, x_in, y_top_in, w_in, h_in):
     """Draw an image, preserving aspect ratio inside the given box."""
     if not img_source:
@@ -143,58 +203,71 @@ def _section_title(c, text, y_top):
 
 def _kpi_card(c, x, y, w, label, value, variation=None, accent=None,
               h=1.0, value_size=24, label_size=8):
-    """Standard KPI card."""
+    """Standard KPI card.
+
+    The variation band is ALWAYS reserved, even when there is no variation,
+    so that values stay aligned across every card in a row.
+    """
     _rect(c, x, y, w, h, fill=WHITE, stroke=BORDER_GRAY)
     if accent:
         _rect(c, x, y, w, 0.045, fill=accent)
-    _text(c, x + 0.15, y + 0.22, str(label).upper(), size=label_size, color=TEXT_GRAY)
-    _text(c, x, y + 0.42 + (h - 1.0) * 0.3, str(value), size=value_size, bold=True,
-          color=DARK_NAVY, align="center", width_in=w)
-    if variation and variation != "—":
-        vcolor = GREEN if "▲" in str(variation) else RED
-        # ReportLab's Helvetica lacks ▲/▼ glyphs, so substitute ASCII arrows
-        vtext = str(variation).replace("▲", "^").replace("▼", "v")
-        _text(c, x, y + h - 0.12, vtext, size=9, bold=True,
-              color=vcolor, align="center", width_in=w)
+
+    label_top, label_h = y + 0.10, 0.22
+    var_h = 0.22
+    value_top = label_top + label_h
+    value_h = h - (value_top - y) - var_h - 0.05
+
+    _text_in_box(c, x, label_top, w, label_h, str(label).upper(),
+                 size=label_size, color=TEXT_GRAY, align="left")
+    _text_in_box(c, x, value_top, w, value_h, value,
+                 size=value_size, bold=True, color=DARK_NAVY, align="center")
+    _variation(c, x, y + h - var_h - 0.05, w, var_h, variation, size=9)
 
 
 def _big_kpi_card(c, x, y, w, h, label, value, variation=None, accent=None):
-    """Large KPI card for the main dashboard page."""
+    """Large KPI card for the main dashboard page (same fixed-band logic)."""
     _rect(c, x, y, w, h, fill=WHITE, stroke=BORDER_GRAY)
     if accent:
         _rect(c, x, y, w, 0.06, fill=accent)
-    _text(c, x, y + 0.35, str(label).upper(), size=13, color=TEXT_GRAY,
-          align="center", width_in=w)
-    _text(c, x, y + h / 2 + 0.35, str(value), size=48, bold=True,
-          color=DARK_NAVY, align="center", width_in=w)
-    if variation and variation != "—":
-        vcolor = GREEN if "▲" in str(variation) else RED
-        vtext = str(variation).replace("▲", "^").replace("▼", "v")
-        _text(c, x, y + h - 0.18, vtext, size=13, bold=True,
-              color=vcolor, align="center", width_in=w)
+
+    label_top, label_h = y + 0.22, 0.32
+    var_h = 0.32
+    value_top = label_top + label_h
+    value_h = h - (value_top - y) - var_h - 0.10
+
+    _text_in_box(c, x, label_top, w, label_h, str(label).upper(),
+                 size=13, color=TEXT_GRAY, align="center")
+    _text_in_box(c, x, value_top, w, value_h, value,
+                 size=44, bold=True, color=DARK_NAVY, align="center")
+    _variation(c, x, y + h - var_h - 0.10, w, var_h, variation, size=13)
 
 
 def _time_card(c, x, y, w, label, value):
-    _rect(c, x, y, w, 0.85, fill=WHITE, stroke=BORDER_GRAY)
-    _text(c, x + 0.15, y + 0.2, str(label).upper(), size=8, color=TEXT_GRAY)
-    _text(c, x, y + 0.62, str(value), size=22, bold=True,
-          color=DARK_NAVY, align="center", width_in=w)
+    h = 0.85
+    _rect(c, x, y, w, h, fill=WHITE, stroke=BORDER_GRAY)
+    _text_in_box(c, x, y + 0.08, w, 0.24, str(label).upper(),
+                 size=8, color=TEXT_GRAY, align="left")
+    _text_in_box(c, x, y + 0.32, w, h - 0.38, value,
+                 size=22, bold=True, color=DARK_NAVY, align="center")
 
 
 def _table(c, x, y, col_widths, headers, rows, header_size=8, row_size=8,
            row_h=0.26, align_first_left=True, bold_last_row=False):
-    """Draw a table with a navy header and alternating row shading."""
+    """Draw a table with a navy header and alternating row shading.
+
+    Cell text is vertically centred inside its own row rectangle.
+    """
     total_w = sum(col_widths)
 
-    # Header
+    # Header row
     _rect(c, x, y, total_w, row_h, fill=DARK_NAVY)
     cx = x
     for w, h_text in zip(col_widths, headers):
-        _text(c, cx, y + row_h / 2 + 0.04, h_text, size=header_size, bold=True,
-              color=WHITE, align="center", width_in=w)
+        _text_in_box(c, cx, y, w, row_h, h_text, size=header_size,
+                     bold=True, color=WHITE, align="center")
         cx += w
 
-    # Rows
+    # Data rows
     cy = y + row_h
     for i, row in enumerate(rows):
         is_last = bold_last_row and i == len(rows) - 1
@@ -203,16 +276,14 @@ def _table(c, x, y, col_widths, headers, rows, header_size=8, row_size=8,
         cx = x
         for j, (w, val) in enumerate(zip(col_widths, row)):
             align = "left" if (j == 0 and align_first_left) else "right"
-            pad = 0.08
-            _text(c, cx + (pad if align == "left" else -pad),
-                  cy + row_h / 2 + 0.04, val,
-                  size=row_size, bold=is_last,
-                  color=DARK_NAVY if is_last else TEXT_DARK,
-                  align=align, width_in=w)
+            _text_in_box(c, cx, cy, w, row_h, val, size=row_size,
+                         bold=is_last,
+                         color=DARK_NAVY if is_last else TEXT_DARK,
+                         align=align)
             cx += w
         cy += row_h
 
-    return cy  # bottom edge, in top-down inches
+    return cy
 
 
 # ======================================================================
@@ -244,12 +315,15 @@ def _page_cover(c, period):
           size=11, color=TEXT_GRAY)
 
     _rect(c, 1.0, 5.3, 3.5, 0.7, fill=LIGHT_GRAY, stroke=BORDER_GRAY)
-    _text(c, 1.15, 5.5, "PERÍODO ANALIZADO", size=8, color=TEXT_GRAY)
-    _text(c, 1.15, 5.85, period, size=14, bold=True, color=DARK_NAVY)
+    _text_in_box(c, 1.0, 5.36, 3.5, 0.24, "PERÍODO ANALIZADO",
+                 size=8, color=TEXT_GRAY, align="left", pad_in=0.15)
+    _text_in_box(c, 1.0, 5.60, 3.5, 0.34, period,
+                 size=14, bold=True, color=DARK_NAVY, align="left", pad_in=0.15)
 
-    _text(c, 9.5, 5.5, "FUENTE", size=8, color=TEXT_GRAY, align="right", width_in=3.0)
-    _text(c, 9.5, 5.85, "Tecnovoz", size=14, bold=True, color=DARK_NAVY,
-          align="right", width_in=3.0)
+    _text_in_box(c, 9.5, 5.36, 3.0, 0.24, "FUENTE",
+                 size=8, color=TEXT_GRAY, align="right")
+    _text_in_box(c, 9.5, 5.60, 3.0, 0.34, "Tecnovoz",
+                 size=14, bold=True, color=DARK_NAVY, align="right")
 
     _rect(c, 0, 7.1, 13.333, 0.04, fill=GREEN)
     _rect(c, 0, 7.14, 13.333, 0.36, fill=DARK_NAVY)
