@@ -86,7 +86,7 @@ st.markdown("""
 </div>""", unsafe_allow_html=True)
 
 # Version banner \u2014 lets you confirm at a glance which version is deployed
-APP_VERSION = "2.1"
+APP_VERSION = "2.2"
 st.caption(f"Versi\u00f3n {APP_VERSION} \u00b7 Incluye: consultas sobre los datos \u00b7 salida PDF \u00b7 resumen autom\u00e1tico")
 
 with st.sidebar:
@@ -536,6 +536,26 @@ if _period_info:
               recibidas=int(global_kpis["recibidas"]["value"]),
               atendidas=int(global_kpis["atendidas"]["value"]),
               nivel_atencion=global_kpis["nivel_atencion"]["value"])
+
+    # Also save the PREVIOUS month when its files were uploaded. Otherwise a
+    # month the user never generated a report for (or one lost when the server
+    # restarted, since its storage is temporary) leaves a hole in the trend.
+    if prev_dfs:
+        _prev_info = None
+        for uf in previous_files:
+            _prev_info = _extract_period_full(uf.name)
+            if _prev_info:
+                break
+        if _prev_info:
+            _, prev_month, prev_year = _prev_info
+            _all_prev = pd.concat(
+                [d.assign(_skill=n) for n, d in prev_dfs.items()], ignore_index=True)
+            _pk = compute_kpis(_all_prev, kpi_defs)
+            add_month(prev_year, prev_month,
+                      recibidas=int(_pk["recibidas"]["value"]),
+                      atendidas=int(_pk["atendidas"]["value"]),
+                      nivel_atencion=_pk["nivel_atencion"]["value"])
+
     # Build trend up to current month
     trend_records = get_trend(cur_year, cur_month)
     monthly_trend_data = [
@@ -543,6 +563,19 @@ if _period_info:
          "atendidas": r.atendidas, "nivel_atencion": r.nivel_atencion}
         for r in trend_records
     ]
+    # Warn about holes in the series (e.g. a month never reported, or lost when
+    # the server restarted). Uploading that month as "mes anterior" fills it.
+    _present = {r.month for r in trend_records}
+    _missing = [m for m in range(1, cur_month + 1) if m not in _present]
+    if _missing:
+        _names = {1:"Enero",2:"Febrero",3:"Marzo",4:"Abril",5:"Mayo",6:"Junio",
+                  7:"Julio",8:"Agosto",9:"Septiembre",10:"Octubre",
+                  11:"Noviembre",12:"Diciembre"}
+        st.warning("Faltan meses en la evolucion mensual: "
+                   + ", ".join(_names[m] for m in _missing)
+                   + ". Para completarlos, genera una vez el reporte de ese mes "
+                     "o cargalo como 'mes anterior'.")
+
     if len(monthly_trend_data) >= 2:
         fig = chart_grouped_bar_line(
             [r["month_name"] for r in monthly_trend_data],

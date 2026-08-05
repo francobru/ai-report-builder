@@ -296,31 +296,58 @@ def chart_vertical_bars(
     *,
     show_data_labels: bool = True,
     color: str = OUTBOUND_BAR,
-    figsize: tuple[float, float] = (SMALL_FIG_WIDTH, SMALL_FIG_HEIGHT),
+    figsize: tuple[float, float] | None = None,
 ) -> plt.Figure:
-    """Simple vertical bar chart for single-series data."""
+    """Vertical bar chart for single-series data.
 
-    x = np.arange(len(labels))
+    The figure width, label rotation and font size adapt to the number of
+    categories, so a full month of daily bars (31 labels) stays readable
+    instead of overlapping.
+    """
+    n = len(labels)
+
+    # Long labels need horizontal room just as much as many labels do
+    longest = max((len(str(l)) for l in labels), default=0)
+
+    if figsize is None:
+        if n > 20:            # a full month of dates
+            figsize = (16.0, 6.0)
+        elif n > 10 or longest > 12:
+            figsize = (11.0, 6.0)
+        else:
+            figsize = (SMALL_FIG_WIDTH, SMALL_FIG_HEIGHT)
+    if n > 20:
+        rotation, tick_fs = 90, max(TICK_SIZE - 3, 8)
+    elif n > 10 or longest > 12:
+        rotation, tick_fs = 45, max(TICK_SIZE - 1, 9)
+    else:
+        rotation, tick_fs = 30, TICK_SIZE
+    ha = "center" if rotation == 90 else "right"
+
+    x = np.arange(n)
     fig, ax = plt.subplots(figsize=figsize)
 
     bars = ax.bar(x, values, width=0.6, color=color, zorder=3)
 
     ax.set_xticks(x)
-    ax.set_xticklabels(labels, rotation=30, ha="right", fontsize=TICK_SIZE)
+    ax.set_xticklabels(labels, rotation=rotation, ha=ha, fontsize=tick_fs)
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(_format_thousands))
 
     if show_data_labels:
+        # With many bars the value labels themselves would collide
+        label_fs = ANNOTATION_SIZE if n <= 20 else max(ANNOTATION_SIZE - 3, 7)
         for bar in bars:
             h = bar.get_height()
             ax.text(bar.get_x() + bar.get_width() / 2, h,
                     _fmt_int(h), ha="center", va="bottom",
-                    fontsize=ANNOTATION_SIZE, fontweight="bold")
+                    fontsize=label_fs, fontweight="bold")
 
     if title:
         ax.set_title(title, fontsize=TITLE_SIZE, fontweight="bold", loc="left", pad=12)
 
     ax.yaxis.grid(True, alpha=0.3, linewidth=0.5, zorder=0)
     ax.set_axisbelow(True)
+    ax.margins(x=0.01)
 
     fig.tight_layout()
     return fig
