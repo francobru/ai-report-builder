@@ -14,16 +14,37 @@ import re
 # ======================================================================
 # Month suffixes (Spanish abbreviations used in filenames)
 # ======================================================================
+# Accepts BOTH the 3-letter abbreviation and the full Spanish month name,
+# with or without an underscore/space separator:
+#     "PM Consultas_jul26"        -> "PM Consultas"
+#     "0800 coca cola Junio26"    -> "0800 coca cola"
+#     "Laboratorio_Julio2026"     -> "Laboratorio"
+# Full names are listed first so the regex prefers the longest match.
+_MONTH_WORDS = (
+    "enero|febrero|marzo|abril|mayo|junio|julio|agosto|"
+    "septiembre|setiembre|octubre|noviembre|diciembre|"
+    "ene|feb|mar|abr|may|jun|jul|ago|sep|set|oct|nov|dic"
+)
+
 _MONTH_PATTERN = re.compile(
-    r"[_ ]+(ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)\d{2}$",
+    r"[_ -]*(" + _MONTH_WORDS + r")[_ -]*(\d{2,4})$",
     re.IGNORECASE,
 )
 
 _MONTH_MAP = {
-    "ene": ("Enero", 1),   "feb": ("Febrero", 2),  "mar": ("Marzo", 3),
-    "abr": ("Abril", 4),   "may": ("Mayo", 5),      "jun": ("Junio", 6),
-    "jul": ("Julio", 7),   "ago": ("Agosto", 8),    "sep": ("Septiembre", 9),
-    "oct": ("Octubre", 10), "nov": ("Noviembre", 11), "dic": ("Diciembre", 12),
+    "ene": ("Enero", 1), "enero": ("Enero", 1),
+    "feb": ("Febrero", 2), "febrero": ("Febrero", 2),
+    "mar": ("Marzo", 3), "marzo": ("Marzo", 3),
+    "abr": ("Abril", 4), "abril": ("Abril", 4),
+    "may": ("Mayo", 5), "mayo": ("Mayo", 5),
+    "jun": ("Junio", 6), "junio": ("Junio", 6),
+    "jul": ("Julio", 7), "julio": ("Julio", 7),
+    "ago": ("Agosto", 8), "agosto": ("Agosto", 8),
+    "sep": ("Septiembre", 9), "set": ("Septiembre", 9),
+    "septiembre": ("Septiembre", 9), "setiembre": ("Septiembre", 9),
+    "oct": ("Octubre", 10), "octubre": ("Octubre", 10),
+    "nov": ("Noviembre", 11), "noviembre": ("Noviembre", 11),
+    "dic": ("Diciembre", 12), "diciembre": ("Diciembre", 12),
 }
 
 
@@ -44,7 +65,7 @@ CAMPAIGN_MAPPING: dict[str, list[str]] = {
         "Gipfel PM",
         "Donacion",
         "Donaci\u00f3n",
-        "0800 onco",
+        "0800 Onco",
         "Osde 210",
         "TelePerfomance",
         "TelePerf Cons",
@@ -61,14 +82,14 @@ CAMPAIGN_MAPPING: dict[str, list[str]] = {
     ],
     "Plan M\u00e9dico": [
         "PM Consultas",
-        "0800 coca cola",
+        "0800 Coca Cola",
     ],
     "Portal": [
         "Portal Digital",
         "Portal Paciente",
     ],
     "Agendas": [
-        "Agendas medicas",
+        "Agendas Medicas",
         "Agendas m\u00e9dicas",
     ],
     "Camp HA": [
@@ -92,6 +113,21 @@ CAMPAIGN_ORDER = ["Conmutador", "Plan M\u00e9dico", "Portal", "Turnos", "Agendas
 # ======================================================================
 # Public API
 # ======================================================================
+
+def canonical_skill_name(name: str) -> str:
+    """Return the canonical spelling of a known skill.
+
+    Filenames vary in capitalisation ("0800 coca cola" vs "0800 Coca Cola"),
+    which would otherwise make the same skill look like two different ones
+    when comparing two months. Unknown skills are returned unchanged.
+    """
+    key = name.lower().strip()
+    for camp_skills in CAMPAIGN_MAPPING.values():
+        for known in camp_skills:
+            if known.lower() == key:
+                return known
+    return name
+
 
 def extract_skill_name(filename: str) -> str:
     """Extract the skill name from a CSV filename.
@@ -117,7 +153,8 @@ def extract_skill_name(filename: str) -> str:
     # Collapse multiple spaces
     name = re.sub(r"\s+", " ", name)
 
-    return name
+    # Normalise capitalisation for known skills
+    return canonical_skill_name(name)
 
 
 def extract_period(filename: str) -> tuple[str, int, int] | None:
@@ -133,11 +170,13 @@ def extract_period(filename: str) -> tuple[str, int, int] | None:
     if not match:
         return None
 
-    month_abbr = match.group(1).lower()
-    year_suffix = match.group(0)[-2:]
+    month_word = match.group(1).lower()
+    digits = match.group(2)
 
-    month_name, month_num = _MONTH_MAP.get(month_abbr, ("?", 0))
-    year = 2000 + int(year_suffix)
+    month_name, month_num = _MONTH_MAP.get(month_word, ("?", 0))
+    year = int(digits)
+    if year < 100:
+        year += 2000
 
     return f"{month_name} {year}", month_num, year
 

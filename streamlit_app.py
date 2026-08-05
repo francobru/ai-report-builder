@@ -86,7 +86,7 @@ st.markdown("""
 </div>""", unsafe_allow_html=True)
 
 # Version banner \u2014 lets you confirm at a glance which version is deployed
-APP_VERSION = "2.0.2"
+APP_VERSION = "2.1"
 st.caption(f"Versi\u00f3n {APP_VERSION} \u00b7 Incluye: consultas sobre los datos \u00b7 salida PDF \u00b7 resumen autom\u00e1tico")
 
 with st.sidebar:
@@ -173,31 +173,34 @@ st.markdown('<h3 class="step-header">2 \u00b7 Seleccionar habilidades a incluir<
 if "skill_selection" not in st.session_state:
     st.session_state.skill_selection = {}
 
-# Reset selection if file list changes
-all_skills = list(all_current_dfs.keys())
-skills_key = tuple(sorted(all_skills))
+# The selector covers the UNION of both months, so a skill that only exists in
+# the previous month (e.g. Laboratorio) can also be excluded. Whatever is
+# unchecked is removed from BOTH months -- report and comparison stay in sync.
+all_skills = sorted(set(all_current_dfs) | set(prev_dfs))
+skills_key = tuple(all_skills)
 if st.session_state.get("_skills_key") != skills_key:
     st.session_state.skill_selection = {s: True for s in all_skills}
     st.session_state._skills_key = skills_key
 
-# Bulk action buttons
 col_all, col_none, col_info = st.columns([1, 1, 3])
 with col_all:
-    if st.button("\u2705 Seleccionar todas", use_container_width=True):
+    if st.button("Seleccionar todas", use_container_width=True):
         for s in all_skills:
             st.session_state.skill_selection[s] = True
         st.rerun()
 with col_none:
-    if st.button("\u274c Deseleccionar todas", use_container_width=True):
+    if st.button("Deseleccionar todas", use_container_width=True):
         for s in all_skills:
             st.session_state.skill_selection[s] = False
         st.rerun()
 with col_info:
-    n_selected = sum(1 for v in st.session_state.skill_selection.values() if v)
+    n_selected = sum(1 for s in all_skills if st.session_state.skill_selection.get(s))
     st.markdown(f"**{n_selected} de {len(all_skills)}** habilidades seleccionadas")
 
-# Group skills by campaign for the checkboxes
-# Build classification using find_campaign directly (no fake filenames)
+if prev_dfs:
+    st.caption("Lo que destildes se excluye del reporte Y de la comparacion "
+               "con el mes anterior.")
+
 classification_all = {}
 for skill in all_skills:
     camp = find_campaign(skill)
@@ -212,18 +215,31 @@ for camp_name in CAMPAIGN_ORDER + ["Camp HA", "Sin asignar"]:
                 unsafe_allow_html=True)
 
     cols = st.columns(4)
-    for i, s in enumerate(skills):
-        skill_name = s["skill"]
+    for i, sk in enumerate(skills):
+        skill_name = sk["skill"]
+        # Mark skills that are not present in both months
+        if prev_dfs:
+            in_cur, in_prev = skill_name in all_current_dfs, skill_name in prev_dfs
+            if in_cur and not in_prev:
+                label = f"{skill_name}  (solo {current_period})"
+            elif in_prev and not in_cur:
+                label = f"{skill_name}  (solo {prev_period})"
+            else:
+                label = skill_name
+        else:
+            label = skill_name
         with cols[i % 4]:
             st.session_state.skill_selection[skill_name] = st.checkbox(
-                skill_name,
+                label,
                 value=st.session_state.skill_selection.get(skill_name, True),
                 key=f"chk_{skill_name}",
             )
 
-# Filter dataframes based on selection
+# Apply the selection to BOTH months
 current_dfs = {s: df for s, df in all_current_dfs.items()
                if st.session_state.skill_selection.get(s, False)}
+prev_dfs = {s: df for s, df in prev_dfs.items()
+            if st.session_state.skill_selection.get(s, False)}
 
 if not current_dfs:
     st.warning("\u26a0\ufe0f No hay habilidades seleccionadas. Marc\u00e1 al menos una para generar el reporte.")
@@ -305,8 +321,9 @@ if prev_dfs and (solo_mes_anterior or solo_mes_actual):
     if solo_mes_actual:
         _msg.append(f"solo en {current_period}: {', '.join(solo_mes_actual)}")
     st.info("Las habilidades no coinciden entre los dos meses (" + "; ".join(_msg) +
-            "). Las variaciones comparan el total completo de cada mes, "
-            "as\u00ed que coinciden con los KPIs mostrados.")
+            "). Se comparan igual: el total de lo seleccionado en cada mes. "
+            "Si no quer\u00e9s que una habilidad entre en la comparacion, "
+            "destildala en el paso 2.")
 
 
 def render_kpi_card(label, value, color, variation=None):
