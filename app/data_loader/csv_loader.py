@@ -11,6 +11,7 @@ Handles the specific quirks of the Tecnovoz export:
 
 from __future__ import annotations
 
+import io
 from pathlib import Path
 
 import pandas as pd
@@ -45,13 +46,22 @@ def load_csv(
     decimal = schema.decimal if schema else ","
     encoding = schema.encoding if schema else "utf-8"
 
-    df = pd.read_csv(
-        filepath,
-        sep=sep,
-        decimal=decimal,
-        encoding=encoding,
-        engine="python",
-    )
+    # Some Tecnovoz exports arrive with NUL bytes where the decimal separator
+    # should be ("79\x0064" instead of "79,64"), which would leave the affected
+    # columns unusable. Sanitise the raw text before parsing.
+    raw = filepath.read_bytes()
+    if b"\x00" in raw:
+        raw = raw.replace(b"\x00", decimal.encode(encoding, errors="ignore"))
+        text = raw.decode(encoding, errors="replace")
+        df = pd.read_csv(io.StringIO(text), sep=sep, decimal=decimal, engine="python")
+    else:
+        df = pd.read_csv(
+            filepath,
+            sep=sep,
+            decimal=decimal,
+            encoding=encoding,
+            engine="python",
+        )
 
     # Strip whitespace from column names
     df.columns = df.columns.str.strip()

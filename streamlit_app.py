@@ -79,6 +79,19 @@ CAMP_BADGE = {"Turnos": "badge-turnos", "Conmutador": "badge-conmutador",
               "Agendas": "badge-agendas", "Camp HA": "badge-campha",
               "Sin asignar": "badge-sin"}
 
+# Report type is chosen first: each type renders its own page.
+with st.sidebar:
+    st.markdown("### Configuracion")
+    _report_type = st.selectbox(
+        "Tipo de reporte",
+        ["Productividad del Contact Center", "Productividad Mensual Plan Medico"],
+    )
+
+if _report_type == "Productividad Mensual Plan Medico":
+    from app.ui.plan_medico_page import render as _render_plan_medico
+    _render_plan_medico()
+    st.stop()
+
 st.markdown("""
 <div class="main-header">
     <h1>\U0001f4ca AI Report Builder</h1>
@@ -86,13 +99,10 @@ st.markdown("""
 </div>""", unsafe_allow_html=True)
 
 # Version banner \u2014 lets you confirm at a glance which version is deployed
-APP_VERSION = "2.2"
-st.caption(f"Versi\u00f3n {APP_VERSION} \u00b7 Incluye: consultas sobre los datos \u00b7 salida PDF \u00b7 resumen autom\u00e1tico")
+APP_VERSION = "3.1"
+st.caption(f"Versi\u00f3n {APP_VERSION} \u00b7 Dos tipos de reporte: Contact Center y Plan Medico")
 
 with st.sidebar:
-    st.markdown("### \u2699\ufe0f Configuraci\u00f3n")
-    st.selectbox("Tipo de reporte", ["Productividad del Contact Center"])
-    st.divider()
     st.markdown("### \U0001f4cb Instrucciones")
     st.markdown(
         "1. Sub\u00ed los **CSVs del mes actual**\n"
