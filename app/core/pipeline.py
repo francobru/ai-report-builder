@@ -1,7 +1,7 @@
 """Report generation pipeline.
 
 Orchestrates the full flow:
-  files → load → validate → KPIs → charts → AI text → assemble report
+  files \u2192 load \u2192 validate \u2192 KPIs \u2192 charts \u2192 AI text \u2192 assemble report
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from app.core.plugin_registry import ReportPlugin
 
 
 # ---------------------------------------------------------------------------
-# Pipeline context — travels through every stage
+# Pipeline context \u2014 travels through every stage
 # ---------------------------------------------------------------------------
 
 @dataclass

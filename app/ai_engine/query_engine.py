@@ -1,10 +1,10 @@
 """Natural-language question answering over the report data.
 
 Answers questions like:
-    "cuántas llamadas atendidas el 15 de junio en Turnos PM Estudios"
-    "nivel de atención de Conmutador"
+    "cu\u00e1ntas llamadas atendidas el 15 de junio en Turnos PM Estudios"
+    "nivel de atenci\u00f3n de Conmutador"
     "total recibidas el 4 de mayo"
-    "cuál fue el peor día de Plan Médico"
+    "cu\u00e1l fue el peor d\u00eda de Plan M\u00e9dico"
 
 No AI API is used: the domain is narrow (known skills, known metrics,
 dates within the period), so the question is parsed with rules and the
@@ -43,12 +43,12 @@ METRICS = {
                      "sin atender"],
     },
     "nivel_atencion": {
-        "column": None, "kind": "na", "label": "nivel de atención",
+        "column": None, "kind": "na", "label": "nivel de atenci\u00f3n",
         "keywords": ["nivel de atencion", "nivel atencion", " na ", "porcentaje de atencion",
                      "% de atencion", "tasa de atencion"],
     },
     "conversacion": {
-        "column": "AVGTALKTIME", "kind": "time", "label": "tiempo de conversación",
+        "column": "AVGTALKTIME", "kind": "time", "label": "tiempo de conversaci\u00f3n",
         "keywords": ["conversacion", "hablado", "talk", "duracion de llamada"],
     },
     "demora": {
@@ -174,7 +174,7 @@ def _detect_date(q: str, available_dates: pd.Series) -> pd.Timestamp | None:
             except ValueError:
                 return None
 
-    # bare "el día 15" — only if the period has a single month
+    # bare "el d\u00eda 15" \u2014 only if the period has a single month
     m = re.search(r"\b(?:el\s+)?dia\s+(\d{1,2})\b", q)
     if m and default_year:
         months = available_dates.dt.month.unique()
@@ -192,7 +192,7 @@ def _detect_subject(q: str, skills: list[str], campaigns: list[str]) -> tuple[st
 
     Returns (name, kind) where kind is 'skill', 'campaign' or ''.
     """
-    # Exact substring match first — longest name wins to avoid
+    # Exact substring match first \u2014 longest name wins to avoid
     # "Conmutador" matching inside a longer skill name
     candidates: list[tuple[str, str]] = (
         [(s, "skill") for s in skills] + [(c, "campaign") for c in campaigns]
@@ -231,12 +231,12 @@ def answer_question(
     question:
         The user's question in Spanish.
     skill_dfs:
-        Mapping of skill name → its DataFrame.
+        Mapping of skill name \u2192 its DataFrame.
     campaign_map:
-        Mapping of campaign name → list of skill names it contains.
+        Mapping of campaign name \u2192 list of skill names it contains.
     """
     if not question or not question.strip():
-        return QueryResult("Escribí una pregunta.", understood=False)
+        return QueryResult("Escrib\u00ed una pregunta.", understood=False)
 
     q = _norm(question)
 
@@ -256,10 +256,10 @@ def answer_question(
     metric_id = _detect_metric(q)
     if metric_id is None:
         return QueryResult(
-            "No identifiqué qué dato buscás.",
+            "No identifiqu\u00e9 qu\u00e9 dato busc\u00e1s.",
             understood=False,
-            suggestion="Probá nombrando la métrica: recibidas, atendidas, "
-                       "nivel de atención, conversación, demora o abandono.",
+            suggestion="Prob\u00e1 nombrando la m\u00e9trica: recibidas, atendidas, "
+                       "nivel de atenci\u00f3n, conversaci\u00f3n, demora o abandono.",
         )
 
     subject, kind = _detect_subject(q, list(skill_dfs), list(campaign_map))
@@ -267,26 +267,26 @@ def answer_question(
 
     # --- Filter the data ---
     data = combined
-    scope = "todas las campañas"
+    scope = "todas las campa\u00f1as"
     if kind == "skill":
         data = combined[combined["_skill"] == subject]
         scope = f"la habilidad {subject}"
     elif kind == "campaign":
         members = campaign_map.get(subject, [])
         data = combined[combined["_skill"].isin(members)]
-        scope = f"la campaña {subject}"
+        scope = f"la campa\u00f1a {subject}"
 
     if data.empty:
-        return QueryResult(f"No encontré datos para {scope}.", understood=True)
+        return QueryResult(f"No encontr\u00e9 datos para {scope}.", understood=True)
 
-    when = "en el período"
+    when = "en el per\u00edodo"
     if target_date is not None:
         data = data[data["date"] == target_date]
         when = f"el {target_date.day}/{target_date.month:02d}"
         if data.empty:
             return QueryResult(
                 f"No hay registros para {scope} {when}. "
-                f"Puede que ese día no haya tenido actividad.",
+                f"Puede que ese d\u00eda no haya tenido actividad.",
                 understood=True,
             )
 
@@ -301,7 +301,7 @@ def answer_question(
         total = float(data["TOTALCALLS"].sum())
         att = float(data["TRANSFER"].sum())
         value = (att / total * 100) if total else 0.0
-        answer = (f"El nivel de atención de {scope} {when} fue de {_fmt_pct(value)} "
+        answer = (f"El nivel de atenci\u00f3n de {scope} {when} fue de {_fmt_pct(value)} "
                   f"({_fmt_int(att)} atendidas sobre {_fmt_int(total)} recibidas).")
 
     else:  # time
@@ -319,7 +319,7 @@ def answer_question(
             Recibidas=("TOTALCALLS", "sum"),
             Atendidas=("TRANSFER", "sum"),
         ).reset_index()
-        grouped["Nivel de Atención"] = (
+        grouped["Nivel de Atenci\u00f3n"] = (
             grouped["Atendidas"] / grouped["Recibidas"].replace(0, 1) * 100
         ).round(2)
         grouped = grouped.rename(columns={"date": "Fecha"})

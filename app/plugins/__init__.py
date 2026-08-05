@@ -1,1 +1,1 @@
-"""Report plugins — each sub-package is a self-contained report type."""
+"""Report plugins \u2014 each sub-package is a self-contained report type."""

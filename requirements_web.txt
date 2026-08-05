@@ -1,4 +1,7 @@
 streamlit>=1.38.0
+# starlette 1.4.0 rompe streamlit (GZipResponder exige thread_minimum_size).
+# Se fija en la ultima version compatible hasta que streamlit lo corrija.
+starlette<1.4.0
 pandas>=2.2.0
 openpyxl>=3.1.0
 matplotlib>=3.9.0

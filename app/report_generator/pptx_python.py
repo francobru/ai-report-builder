@@ -1,7 +1,7 @@
 """PPTX report generator using python-pptx (pure Python).
 
 Generates the Contact Center monthly report matching the HA visual style.
-No Node.js dependency — suitable for Streamlit Cloud deployment.
+No Node.js dependency \u2014 suitable for Streamlit Cloud deployment.
 """
 
 from __future__ import annotations
@@ -103,10 +103,10 @@ def _add_footer(slide, page_num, total_pages):
     _add_rect(slide, Inches(0.5), Inches(6.9), Inches(12.3), Pt(1),
               fill_color=RGBColor(0xCC, 0xCC, 0xCC))
     _add_textbox(slide, Inches(0.5), Inches(6.95), Inches(6), Inches(0.3),
-                 "Hospital Alemán · Fuente: Tecnovoz",
+                 "Hospital Alem\u00e1n \u00b7 Fuente: Tecnovoz",
                  font_size=8, color=TEXT_GRAY)
     _add_textbox(slide, Inches(9), Inches(6.95), Inches(3.8), Inches(0.3),
-                 f"Página {page_num} de {total_pages}",
+                 f"P\u00e1gina {page_num} de {total_pages}",
                  font_size=8, color=TEXT_GRAY, alignment=PP_ALIGN.RIGHT)
 
 
@@ -118,52 +118,67 @@ def _add_section_title(slide, text, y_inches):
                  text, font_size=14, bold=True, color=TEXT_DARK)
 
 
-def _add_kpi_card(slide, x, y, w, label, value, variation=None, accent_color=None):
-    """Add a KPI card with label, value and optional variation."""
-    h = Inches(1.0)
-    # Card border
-    _add_rect(slide, Inches(x), Inches(y), Inches(w), h,
+def _add_kpi_card(slide, x, y, w, label, value, variation=None, accent_color=None,
+                  h=0.82, value_size=20, label_size=7):
+    """Compact KPI card, leaving more room on the slide for the chart."""
+    _add_rect(slide, Inches(x), Inches(y), Inches(w), Inches(h),
               fill_color=WHITE, line_color=BORDER_GRAY)
-    # Accent line
     if accent_color:
-        _add_rect(slide, Inches(x), Inches(y), Inches(w), Pt(3),
-                  fill_color=accent_color)
-    # Label
-    _add_textbox(slide, Inches(x + 0.15), Inches(y + 0.1), Inches(w - 0.3), Inches(0.2),
-                 label.upper(), font_size=8, color=TEXT_GRAY)
-    # Value
-    _add_textbox(slide, Inches(x + 0.15), Inches(y + 0.3), Inches(w - 0.3), Inches(0.4),
-                 str(value), font_size=24, bold=True, color=DARK_NAVY,
+        _add_rect(slide, Inches(x), Inches(y), Inches(w), Pt(3), fill_color=accent_color)
+    _add_textbox(slide, Inches(x + 0.12), Inches(y + 0.07), Inches(w - 0.24), Inches(0.18),
+                 label.upper(), font_size=label_size, color=TEXT_GRAY)
+    _add_textbox(slide, Inches(x + 0.1), Inches(y + 0.24), Inches(w - 0.2), Inches(0.34),
+                 str(value), font_size=value_size, bold=True, color=DARK_NAVY,
                  alignment=PP_ALIGN.CENTER)
-    # Variation
-    if variation and variation != "—":
-        var_color = GREEN if "▲" in str(variation) else RED
-        _add_textbox(slide, Inches(x + 0.15), Inches(y + 0.72), Inches(w - 0.3), Inches(0.22),
-                     str(variation), font_size=9, color=var_color,
-                     alignment=PP_ALIGN.CENTER)
+    if variation and variation != "-":
+        var_color = GREEN if "\u25b2" in str(variation) else RED
+        _add_textbox(slide, Inches(x + 0.1), Inches(y + h - 0.24), Inches(w - 0.2), Inches(0.2),
+                     str(variation), font_size=8, color=var_color, alignment=PP_ALIGN.CENTER)
 
 
-def _add_time_card(slide, x, y, w, label, value):
-    """Add a time KPI card."""
-    h = Inches(0.85)
-    _add_rect(slide, Inches(x), Inches(y), Inches(w), h,
+def _add_time_card(slide, x, y, w, label, value, h=0.66):
+    """Compact time card."""
+    _add_rect(slide, Inches(x), Inches(y), Inches(w), Inches(h),
               fill_color=WHITE, line_color=BORDER_GRAY)
-    _add_textbox(slide, Inches(x + 0.15), Inches(y + 0.08), Inches(w - 0.3), Inches(0.2),
-                 label.upper(), font_size=8, color=TEXT_GRAY)
-    _add_textbox(slide, Inches(x + 0.15), Inches(y + 0.3), Inches(w - 0.3), Inches(0.35),
-                 str(value), font_size=22, bold=True, color=DARK_NAVY,
+    _add_textbox(slide, Inches(x + 0.12), Inches(y + 0.05), Inches(w - 0.24), Inches(0.18),
+                 label.upper(), font_size=7, color=TEXT_GRAY)
+    _add_textbox(slide, Inches(x + 0.1), Inches(y + 0.24), Inches(w - 0.2), Inches(0.34),
+                 str(value), font_size=17, bold=True, color=DARK_NAVY,
                  alignment=PP_ALIGN.CENTER)
 
 
 def _add_chart_image(slide, image_bytes_or_path, x, y, w, h):
-    """Add a chart image to the slide."""
+    """Add a chart image, PRESERVING its aspect ratio.
+
+    The image is scaled to fit inside the (w x h) box and centred, so a
+    chart is never squashed or stretched -- which is what made charts
+    look blurry and deformed.
+    """
+    src = None
     if isinstance(image_bytes_or_path, (str, Path)):
         p = Path(image_bytes_or_path)
-        if p.exists():
-            slide.shapes.add_picture(str(p), Inches(x), Inches(y), Inches(w), Inches(h))
+        if not p.exists():
+            return
+        src = str(p)
     elif isinstance(image_bytes_or_path, bytes):
-        stream = io.BytesIO(image_bytes_or_path)
-        slide.shapes.add_picture(stream, Inches(x), Inches(y), Inches(w), Inches(h))
+        src = io.BytesIO(image_bytes_or_path)
+    if src is None:
+        return
+
+    try:
+        from PIL import Image as _PILImage
+        if isinstance(src, io.BytesIO):
+            src.seek(0)
+            iw, ih = _PILImage.open(src).size
+            src.seek(0)
+        else:
+            iw, ih = _PILImage.open(src).size
+        scale = min(w / (iw / 96.0), h / (ih / 96.0))
+        dw, dh = (iw / 96.0) * scale, (ih / 96.0) * scale
+        dx, dy = x + (w - dw) / 2, y + (h - dh) / 2
+        slide.shapes.add_picture(src, Inches(dx), Inches(dy), Inches(dw), Inches(dh))
+    except Exception:
+        slide.shapes.add_picture(src, Inches(x), Inches(y), Inches(w), Inches(h))
 
 
 # ======================================================================
@@ -171,14 +186,14 @@ def _add_chart_image(slide, image_bytes_or_path, x, y, w, h):
 # ======================================================================
 
 def _build_cover(prs, period):
-    """Slide 1: Cover page with Hospital Alemán + JCI logo."""
+    """Slide 1: Cover page with Hospital Alem\u00e1n + JCI logo."""
     slide = prs.slides.add_slide(prs.slide_layouts[6])  # Blank
 
     # Top bands
     _add_rect(slide, 0, 0, SLIDE_W, Inches(0.35), fill_color=DARK_NAVY)
     _add_rect(slide, 0, Inches(0.35), SLIDE_W, Inches(0.04), fill_color=GREEN)
 
-    # Logo (apaisado — horizontal HA + JCI). Centered horizontally.
+    # Logo (apaisado \u2014 horizontal HA + JCI). Centered horizontally.
     # The logo is embedded as base64 in logo_data.py so it can never be lost
     # during GitHub uploads. Falls back to a file path, then to text.
     logo_stream = None
@@ -201,7 +216,7 @@ def _build_cover(prs, period):
     else:
         # Fallback: text if logo missing
         _add_textbox(slide, Inches(2), Inches(1.8), Inches(9), Inches(1.2),
-                     "Hospital Alemán", font_size=44, bold=True, color=DARK_NAVY,
+                     "Hospital Alem\u00e1n", font_size=44, bold=True, color=DARK_NAVY,
                      alignment=PP_ALIGN.CENTER)
 
     # Title with accent
@@ -211,16 +226,16 @@ def _build_cover(prs, period):
                  "Productividad del Contact Center",
                  font_size=28, bold=True, color=DARK_NAVY)
     _add_textbox(slide, Inches(1.0), Inches(4.2), Inches(10), Inches(0.4),
-                 "Análisis de Campañas", font_size=16, color=TEXT_DARK)
+                 "An\u00e1lisis de Campa\u00f1as", font_size=16, color=TEXT_DARK)
     _add_textbox(slide, Inches(1.0), Inches(4.6), Inches(10), Inches(0.3),
-                 "Volumen de llamadas, nivel de atención y tiempos operativos",
+                 "Volumen de llamadas, nivel de atenci\u00f3n y tiempos operativos",
                  font_size=11, color=TEXT_GRAY)
 
     # Period box
     _add_rect(slide, Inches(1.0), Inches(5.3), Inches(3.5), Inches(0.7),
               fill_color=LIGHT_GRAY, line_color=BORDER_GRAY)
     _add_textbox(slide, Inches(1.15), Inches(5.35), Inches(3), Inches(0.2),
-                 "PERÍODO ANALIZADO", font_size=8, color=TEXT_GRAY)
+                 "PER\u00cdODO ANALIZADO", font_size=8, color=TEXT_GRAY)
     _add_textbox(slide, Inches(1.15), Inches(5.55), Inches(3), Inches(0.35),
                  period, font_size=14, bold=True, color=DARK_NAVY)
 
@@ -252,8 +267,8 @@ def _add_big_kpi_card(slide, x, y, w, h, label, value, variation=None, accent_co
                  str(value), font_size=54, bold=True, color=DARK_NAVY,
                  alignment=PP_ALIGN.CENTER)
     # Variation
-    if variation and variation != "—":
-        var_color = GREEN if "▲" in str(variation) else RED
+    if variation and variation != "\u2014":
+        var_color = GREEN if "\u25b2" in str(variation) else RED
         _add_textbox(slide, Inches(x + 0.2), Inches(y + h - 0.55), Inches(w - 0.4), Inches(0.35),
                      str(variation), font_size=14, bold=True, color=var_color,
                      alignment=PP_ALIGN.CENTER)
@@ -263,10 +278,10 @@ def _build_general_data(prs, period, kpis, variations):
     """Slide 2: General data with 5 large KPI cards in 2 rows.
 
     Row 1 (top): Recibidas | Atendidas
-    Row 2 (bottom): Prom. Diario Recibidas | Prom. Diario Atendidas | Nivel de Atención
+    Row 2 (bottom): Prom. Diario Recibidas | Prom. Diario Atendidas | Nivel de Atenci\u00f3n
     """
     slide = prs.slides.add_slide(prs.slide_layouts[6])
-    subtitle = f"Productividad del Contact Center · {period}"
+    subtitle = f"Productividad del Contact Center \u00b7 {period}"
     _add_header_bar(slide, "Datos Generales", subtitle, period)
     _add_footer(slide, 2, 19)
     _add_section_title(slide, "Indicadores principales del mes", 0.9)
@@ -285,10 +300,10 @@ def _build_general_data(prs, period, kpis, variations):
     row1_start = (13.333 - total_w) / 2  # Center in slide
 
     _add_big_kpi_card(slide, row1_start, row1_y, card_w, row1_h,
-                      "Recibidas", kpis.get("recibidas", "—"),
+                      "Recibidas", kpis.get("recibidas", "\u2014"),
                       variations.get("recibidas", ""), DARK_NAVY)
     _add_big_kpi_card(slide, row1_start + card_w + row1_gap, row1_y, card_w, row1_h,
-                      "Atendidas", kpis.get("atendidas", "—"),
+                      "Atendidas", kpis.get("atendidas", "\u2014"),
                       variations.get("atendidas", ""), MEDIUM_BLUE)
 
     # === ROW 2: Prom. Rec + Prom. Att + NA (3 medium cards, centered) ===
@@ -300,59 +315,55 @@ def _build_general_data(prs, period, kpis, variations):
     row2_start = (13.333 - total_w2) / 2
 
     _add_big_kpi_card(slide, row2_start, row2_y, card_w2, row2_h,
-                      "Prom. Diario Recibidas", kpis.get("promedio_recibidas", "—"),
+                      "Prom. Diario Recibidas", kpis.get("promedio_recibidas", "\u2014"),
                       None, TEXT_GRAY)
     _add_big_kpi_card(slide, row2_start + card_w2 + row2_gap, row2_y, card_w2, row2_h,
-                      "Prom. Diario Atendidas", kpis.get("promedio_atendidas", "—"),
+                      "Prom. Diario Atendidas", kpis.get("promedio_atendidas", "\u2014"),
                       None, TEXT_GRAY)
     _add_big_kpi_card(slide, row2_start + (card_w2 + row2_gap) * 2, row2_y, card_w2, row2_h,
-                      "Nivel de Atención", kpis.get("nivel_atencion", "—"),
+                      "Nivel de Atenci\u00f3n", kpis.get("nivel_atencion", "\u2014"),
                       variations.get("nivel_atencion", ""), GREEN)
 
 
 def _build_campaign_slide(prs, name, kpis, variations, chart_path,
                            page_num, period, is_all=False):
-    """Build a campaign slide with KPIs + time cards + chart."""
+    """Campaign slide: compact indicator strip on top, large chart below."""
     slide = prs.slides.add_slide(prs.slide_layouts[6])
-    subtitle = f"Productividad del Contact Center · {period}"
-    title = name if is_all else f"Campaña: {name}"
+    subtitle = f"Productividad del Contact Center \u00b7 {period}"
+    title = name if is_all else f"Campa\u00f1a: {name}"
     _add_header_bar(slide, title, subtitle, period)
     _add_footer(slide, page_num, 19)
-    _add_section_title(slide, "Indicadores y distribución diaria", 0.9)
+    _add_section_title(slide, "Indicadores y distribuci\u00f3n diaria", 0.85)
 
-    cardW = 2.3
-    gap = 0.15
-    startX = 0.5
-
+    cardW, gap, startX = 2.3, 0.15, 0.5
     cards = [
-        ("Recibidas", kpis.get("recibidas", "—"), variations.get("recibidas", ""), DARK_NAVY),
-        ("Atendidas", kpis.get("atendidas", "—"), variations.get("atendidas", ""), MEDIUM_BLUE),
-        ("Prom. Recibidas", kpis.get("promedio_recibidas", "—"), None, None),
-        ("Prom. Atendidas", kpis.get("promedio_atendidas", "—"), None, None),
-        ("Nivel de Atención", kpis.get("nivel_atencion", "—"), variations.get("nivel_atencion", ""), GREEN),
+        ("Recibidas", kpis.get("recibidas", "-"), variations.get("recibidas", ""), DARK_NAVY),
+        ("Atendidas", kpis.get("atendidas", "-"), variations.get("atendidas", ""), MEDIUM_BLUE),
+        ("Prom. Recibidas", kpis.get("promedio_recibidas", "-"), None, None),
+        ("Prom. Atendidas", kpis.get("promedio_atendidas", "-"), None, None),
+        ("Nivel de Atenci\u00f3n", kpis.get("nivel_atencion", "-"),
+         variations.get("nivel_atencion", ""), GREEN),
     ]
     for i, (label, value, var, accent) in enumerate(cards):
-        _add_kpi_card(slide, startX + i * (cardW + gap), 1.4, cardW,
+        _add_kpi_card(slide, startX + i * (cardW + gap), 1.28, cardW,
                       label, value, var, accent)
 
-    # Time cards
     timeW = 3.8
-    _add_time_card(slide, startX, 2.6, timeW,
-                   "Conversación", kpis.get("tiempo_conversacion", "—"))
-    _add_time_card(slide, startX + timeW + gap, 2.6, timeW,
-                   "Demora", kpis.get("tiempo_demora", "—"))
-    _add_time_card(slide, startX + (timeW + gap) * 2, 2.6, timeW,
-                   "Abandono", kpis.get("tiempo_abandono", "—"))
+    for i, (lbl, key) in enumerate([("Conversaci\u00f3n", "tiempo_conversacion"),
+                                     ("Demora", "tiempo_demora"),
+                                     ("Abandono", "tiempo_abandono")]):
+        _add_time_card(slide, startX + i * (timeW + gap), 2.22, timeW,
+                       lbl, kpis.get(key, "-"))
 
-    # Chart
+    # Chart gets the whole lower half of the slide
     if chart_path:
-        _add_chart_image(slide, chart_path, 0.3, 3.7, 12.5, 3.0)
+        _add_chart_image(slide, chart_path, 0.35, 3.05, 12.6, 3.75)
 
 
 def _build_chart_slide(prs, title, section, chart_path, page_num, period):
     """Build a slide with just a header and a chart."""
     slide = prs.slides.add_slide(prs.slide_layouts[6])
-    subtitle = f"Productividad del Contact Center · {period}"
+    subtitle = f"Productividad del Contact Center \u00b7 {period}"
     _add_header_bar(slide, title, subtitle, period)
     _add_footer(slide, page_num, 19)
     _add_section_title(slide, section, 0.9)
@@ -364,7 +375,7 @@ def _build_dual_chart_slide(prs, title, section, chart_left, chart_right,
                               page_num, period, footnote=None):
     """Build a slide with two charts side by side (e.g., campaign analysis)."""
     slide = prs.slides.add_slide(prs.slide_layouts[6])
-    subtitle = f"Productividad del Contact Center · {period}"
+    subtitle = f"Productividad del Contact Center \u00b7 {period}"
     _add_header_bar(slide, title, subtitle, period)
     _add_footer(slide, page_num, 19)
     _add_section_title(slide, section, 0.9)
@@ -383,16 +394,16 @@ def _build_dual_chart_slide(prs, title, section, chart_left, chart_right,
 def _build_skill_table_slide(prs, skill_table, page_num, period):
     """Build the skill detail table slide."""
     slide = prs.slides.add_slide(prs.slide_layouts[6])
-    subtitle = f"Productividad del Contact Center · {period}"
-    _add_header_bar(slide, "Análisis de Habilidades", subtitle, period)
+    subtitle = f"Productividad del Contact Center \u00b7 {period}"
+    _add_header_bar(slide, "An\u00e1lisis de Habilidades", subtitle, period)
     _add_footer(slide, page_num, 19)
-    _add_section_title(slide, "Detalle por habilidad — volumen, atención y tiempos promedio", 0.9)
+    _add_section_title(slide, "Detalle por habilidad \u2014 volumen, atenci\u00f3n y tiempos promedio", 0.9)
 
     if not skill_table:
         return
 
     headers = ["Habilidad", "Recibidas", "Atendidas", "NA",
-               "Conversación", "Demora", "Abandono"]
+               "Conversaci\u00f3n", "Demora", "Abandono"]
     n_rows = len(skill_table) + 1
     n_cols = len(headers)
 
@@ -499,10 +510,10 @@ def _build_annex_daily_table(prs, campaign_name, daily_rows, page_num, total_pag
     side-by-side tables so everything fits inside the slide.
     """
     slide = prs.slides.add_slide(prs.slide_layouts[6])
-    subtitle = f"Productividad del Contact Center · {period}"
-    _add_header_bar(slide, f"Anexo — {campaign_name}", subtitle, period)
+    subtitle = f"Productividad del Contact Center \u00b7 {period}"
+    _add_header_bar(slide, f"Anexo \u2014 {campaign_name}", subtitle, period)
     _add_footer(slide, page_num, total_pages)
-    _add_section_title(slide, f"Productividad diaria — {campaign_name}", 0.9)
+    _add_section_title(slide, f"Productividad diaria \u2014 {campaign_name}", 0.9)
 
     if not daily_rows:
         _add_textbox(slide, Inches(0.7), Inches(1.5), Inches(10), Inches(0.4),
@@ -589,10 +600,10 @@ def _build_annex_daily_table(prs, campaign_name, daily_rows, page_num, total_pag
 def _build_outbound_slide(prs, outbound, chart_images, page_num, total_pages, period):
     """Slide: Llamadas Salientes with KPIs + result distribution + daily chart."""
     slide = prs.slides.add_slide(prs.slide_layouts[6])
-    subtitle = f"Productividad del Contact Center · {period}"
+    subtitle = f"Productividad del Contact Center \u00b7 {period}"
     _add_header_bar(slide, "Llamadas Salientes", subtitle, period)
     _add_footer(slide, page_num, total_pages)
-    _add_section_title(slide, "Resumen de gestión de llamadas salientes", 0.9)
+    _add_section_title(slide, "Resumen de gesti\u00f3n de llamadas salientes", 0.9)
 
     # KPI cards. Rotaciones AM and Solo Operadores AM are left BLANK on purpose:
     # those figures come from the supervisors' cancellation registry, so the
@@ -608,7 +619,7 @@ def _build_outbound_slide(prs, outbound, chart_images, page_num, total_pages, pe
 
     # Hint that these two are filled manually
     _add_textbox(slide, 4.6 * 914400, int(2.42 * 914400), int(7.9 * 914400), int(0.25 * 914400),
-                 "Completar manualmente — fuente: registro de cancelaciones de supervisores",
+                 "Completar manualmente \u2014 fuente: registro de cancelaciones de supervisores",
                  font_size=8, italic=True, color=TEXT_GRAY, alignment=PP_ALIGN.CENTER)
 
     # Two charts side by side
@@ -619,16 +630,16 @@ def _build_outbound_slide(prs, outbound, chart_images, page_num, total_pages, pe
 
 
 def _build_monthly_trend_slide(prs, trend_records, chart_path, page_num, total_pages, period):
-    """Slide: Evolución Mensual with a table + trend chart."""
+    """Slide: Evoluci\u00f3n Mensual with a table + trend chart."""
     slide = prs.slides.add_slide(prs.slide_layouts[6])
-    subtitle = f"Productividad del Contact Center · {period}"
-    _add_header_bar(slide, "Evolución Mensual", subtitle, period)
+    subtitle = f"Productividad del Contact Center \u00b7 {period}"
+    _add_header_bar(slide, "Evoluci\u00f3n Mensual", subtitle, period)
     _add_footer(slide, page_num, total_pages)
-    _add_section_title(slide, "Tendencia mensual del año", 0.9)
+    _add_section_title(slide, "Tendencia mensual del a\u00f1o", 0.9)
 
     if not trend_records:
         _add_textbox(slide, Inches(0.7), Inches(1.5), Inches(10), Inches(0.4),
-                     "Sin datos históricos disponibles", font_size=12,
+                     "Sin datos hist\u00f3ricos disponibles", font_size=12,
                      color=TEXT_GRAY, italic=True)
         return
 
@@ -638,7 +649,7 @@ def _build_monthly_trend_slide(prs, trend_records, chart_path, page_num, total_p
     rows_spec = [
         ("Recibidas", [f"{r['recibidas']:,}".replace(",", ".") for r in trend_records]),
         ("Atendidas", [f"{r['atendidas']:,}".replace(",", ".") for r in trend_records]),
-        ("Nivel de Atención", [f"{r['nivel_atencion']:.1f}%".replace(".", ",") for r in trend_records]),
+        ("Nivel de Atenci\u00f3n", [f"{r['nivel_atencion']:.1f}%".replace(".", ",") for r in trend_records]),
     ]
 
     n_cols = n_months + 1
@@ -698,10 +709,10 @@ def _build_skills_reference_annex(prs, skills_reference, page_num, total_pages, 
     Rendered in up to 3 side-by-side columns so all 19+ skills fit.
     """
     slide = prs.slides.add_slide(prs.slide_layouts[6])
-    subtitle = f"Productividad del Contact Center · {period}"
-    _add_header_bar(slide, "Anexo — Referencia de Habilidades", subtitle, period)
+    subtitle = f"Productividad del Contact Center \u00b7 {period}"
+    _add_header_bar(slide, "Anexo \u2014 Referencia de Habilidades", subtitle, period)
     _add_footer(slide, page_num, total_pages)
-    _add_section_title(slide, "Habilidades por campaña", 0.9)
+    _add_section_title(slide, "Habilidades por campa\u00f1a", 0.9)
 
     if not skills_reference:
         _add_textbox(slide, Inches(0.7), Inches(1.5), Inches(10), Inches(0.4),
@@ -709,7 +720,7 @@ def _build_skills_reference_annex(prs, skills_reference, page_num, total_pages, 
         return
 
     rows = [[s["skill"], s["campaign"]] for s in skills_reference]
-    headers = ["Habilidad", "Campaña"]
+    headers = ["Habilidad", "Campa\u00f1a"]
 
     n = len(rows)
     n_cols_layout = 1 if n <= 14 else (2 if n <= 28 else 3)
@@ -787,7 +798,7 @@ def generate_pptx_report(
     skill_table : list of dict
         Each dict has: name, recibidas, atendidas, na, conversacion, demora, abandono
     chart_images : dict
-        Chart id → file path or bytes
+        Chart id \u2192 file path or bytes
     annexes : list of dict, optional
         Daily productivity tables per campaign. Each dict has:
           - campaign_name: str
@@ -813,14 +824,14 @@ def generate_pptx_report(
     _build_general_data(prs, period, global_kpis, global_variations)
 
     # 3. Weekday distribution
-    _build_chart_slide(prs, "Distribución por Día de Semana",
-                       "Comportamiento por día — todas las campañas",
+    _build_chart_slide(prs, "Distribuci\u00f3n por D\u00eda de Semana",
+                       "Comportamiento por d\u00eda \u2014 todas las campa\u00f1as",
                        chart_images.get("weekday_distribution"),
                        3, period)
 
     # 4. Campaign analysis (dual charts)
-    _build_dual_chart_slide(prs, "Análisis de Campañas",
-                            "Volumen y participación por campaña",
+    _build_dual_chart_slide(prs, "An\u00e1lisis de Campa\u00f1as",
+                            "Volumen y participaci\u00f3n por campa\u00f1a",
                             chart_images.get("campaign_volume"),
                             chart_images.get("campaign_share"),
                             4, period,
@@ -835,7 +846,7 @@ def generate_pptx_report(
 
     page = 5 + len(campaign_data)
 
-    # Monthly trend (evolución mensual)
+    # Monthly trend (evoluci\u00f3n mensual)
     if monthly_trend:
         _build_monthly_trend_slide(prs, monthly_trend,
                                    chart_images.get("monthly_evolution"),
@@ -849,7 +860,7 @@ def generate_pptx_report(
 
     # Top 10 skills chart
     if chart_images.get("skill_volume_top10"):
-        _build_chart_slide(prs, "Análisis de Habilidades — Top 10",
+        _build_chart_slide(prs, "An\u00e1lisis de Habilidades \u2014 Top 10",
                            "Top 10 habilidades por volumen de llamadas",
                            chart_images["skill_volume_top10"], page, period)
         page += 1
@@ -869,7 +880,7 @@ def generate_pptx_report(
             period,
         )
 
-    # Final annex: skill → campaign reference table
+    # Final annex: skill \u2192 campaign reference table
     if skills_reference:
         _build_skills_reference_annex(prs, skills_reference,
                                       skill_page + 1 + len(annexes),

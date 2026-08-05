@@ -1,4 +1,4 @@
-"""PPTX report generator — Python wrapper for the pptxgenjs script.
+"""PPTX report generator \u2014 Python wrapper for the pptxgenjs script.
 
 Builds a JSON configuration from pipeline context and calls the
 Node.js script to generate the PowerPoint file.
@@ -91,7 +91,7 @@ def _build_config(ctx: PipelineContext, output_path: Path) -> dict[str, Any]:
 
     # Individual campaigns
     campaigns = []
-    for camp_name in ["Conmutador", "Plan Médico", "Portal", "Turnos", "Agendas"]:
+    for camp_name in ["Conmutador", "Plan M\u00e9dico", "Portal", "Turnos", "Agendas"]:
         if camp_name in ctx.campaign_kpis:
             chart_key = f"daily_{camp_name.lower().replace(' ', '_')}"
             campaigns.append({
@@ -122,7 +122,7 @@ def _build_config(ctx: PipelineContext, output_path: Path) -> dict[str, Any]:
 
 def _format_kpis(kpis: dict[str, dict]) -> dict[str, str]:
     """Extract formatted values from KPI results dict."""
-    return {kpi_id: data.get("formatted", "—") for kpi_id, data in kpis.items()}
+    return {kpi_id: data.get("formatted", "\u2014") for kpi_id, data in kpis.items()}
 
 
 def _format_variations(variations: dict[str, dict]) -> dict[str, str]:

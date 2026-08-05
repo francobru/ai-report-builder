@@ -93,7 +93,7 @@ class ReportPlugin(ABC):
     Subclasses register automatically when their module is imported.
     """
 
-    # Metadata — set by subclass
+    # Metadata \u2014 set by subclass
     name: str = ""                  # Internal ID  (e.g. "contact_center")
     display_name: str = ""          # UI label     (e.g. "Productividad del Contact Center")
     description: str = ""
@@ -119,7 +119,7 @@ class ReportPlugin(ABC):
         """Return the path to the PPTX/DOCX template, or None."""
 
     def get_campaign_mapping(self) -> dict[str, list[str]]:
-        """Return a mapping of campaign name → list of skill CSV filenames.
+        """Return a mapping of campaign name \u2192 list of skill CSV filenames.
 
         Override in the plugin to define how individual skill CSVs are
         grouped into campaigns.  The default returns an empty dict

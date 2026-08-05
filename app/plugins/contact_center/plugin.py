@@ -1,7 +1,7 @@
-"""Contact Center plugin — Productividad del Contact Center.
+"""Contact Center plugin \u2014 Productividad del Contact Center.
 
 Defines the complete data contract for the monthly Contact Center report
-produced for Hospital Alemán with data sourced from Tecnovoz.
+produced for Hospital Alem\u00e1n with data sourced from Tecnovoz.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ class ContactCenterPlugin(ReportPlugin):
     display_name = "Productividad del Contact Center"
     description = (
         "Reporte mensual de productividad del Contact Center: "
-        "volumen de llamadas, nivel de atención y tiempos operativos."
+        "volumen de llamadas, nivel de atenci\u00f3n y tiempos operativos."
     )
 
     # ------------------------------------------------------------------
@@ -38,10 +38,10 @@ class ContactCenterPlugin(ReportPlugin):
                 ColumnSpec("TRANSFER", dtype="float64", required=True, description="Llamadas atendidas"),
                 ColumnSpec("NOTRANSFER", dtype="float64", required=True, description="Llamadas no atendidas"),
                 ColumnSpec("TOTALCALLS", dtype="float64", required=True, description="Total llamadas recibidas"),
-                ColumnSpec("PCTATT", dtype="float64", required=True, description="Nivel de atención (%)"),
+                ColumnSpec("PCTATT", dtype="float64", required=True, description="Nivel de atenci\u00f3n (%)"),
                 ColumnSpec("AVGCONNWAIT", dtype="object", required=True, description="Demora promedio (HH:MM:SS)"),
                 ColumnSpec("AVGABNWAIT", dtype="object", required=True, description="Abandono promedio (HH:MM:SS)"),
-                ColumnSpec("AVGTALKTIME", dtype="object", required=True, description="Conversación promedio (HH:MM:SS)"),
+                ColumnSpec("AVGTALKTIME", dtype="object", required=True, description="Conversaci\u00f3n promedio (HH:MM:SS)"),
                 ColumnSpec("SVCLEVEL", dtype="float64", required=False, description="Nivel de servicio (%)"),
                 ColumnSpec("SLCALLS", dtype="float64", required=False, description="Llamadas dentro de SL"),
                 ColumnSpec("LOGDATE", dtype="float64", required=True, description="Fecha YYYYMMDD"),
@@ -65,7 +65,7 @@ class ContactCenterPlugin(ReportPlugin):
                 source_column="TOTALCALLS",
                 aggregation="sum",
                 format_str="{:,.0f}",
-                description="Total de llamadas recibidas en el período",
+                description="Total de llamadas recibidas en el per\u00edodo",
             ),
             KPIDefinition(
                 id="atendidas",
@@ -93,20 +93,20 @@ class ContactCenterPlugin(ReportPlugin):
             ),
             KPIDefinition(
                 id="nivel_atencion",
-                label="Nivel de Atención",
+                label="Nivel de Atenci\u00f3n",
                 unit="%",
                 aggregation="custom",
                 format_str="{:.2f}%",
-                description="Atendidas / Recibidas × 100",
+                description="Atendidas / Recibidas \u00d7 100",
             ),
             KPIDefinition(
                 id="tiempo_conversacion",
-                label="Conversación",
+                label="Conversaci\u00f3n",
                 unit="HH:MM:SS",
                 source_column="AVGTALKTIME",
                 aggregation="mean_time",
                 format_str="{}",
-                description="Tiempo promedio de conversación",
+                description="Tiempo promedio de conversaci\u00f3n",
             ),
             KPIDefinition(
                 id="tiempo_demora",
@@ -137,35 +137,35 @@ class ContactCenterPlugin(ReportPlugin):
             ChartDefinition(
                 id="daily_distribution",
                 chart_type="bar_line",
-                title="Distribución diaria — {campaign}",
+                title="Distribuci\u00f3n diaria \u2014 {campaign}",
                 x_column="date",
                 y_columns=["TOTALCALLS", "TRANSFER"],
                 line_column="PCTATT",
-                description="Barras recibidas/atendidas + línea nivel de atención por día",
+                description="Barras recibidas/atendidas + l\u00ednea nivel de atenci\u00f3n por d\u00eda",
             ),
             ChartDefinition(
                 id="weekday_distribution",
                 chart_type="grouped_bar_line",
-                title="Distribución por día de semana",
-                description="Agregado por día de semana (lun–dom) con línea NA",
+                title="Distribuci\u00f3n por d\u00eda de semana",
+                description="Agregado por d\u00eda de semana (lun\u2013dom) con l\u00ednea NA",
             ),
             ChartDefinition(
                 id="campaign_volume",
                 chart_type="horizontal_bar",
-                title="Distribución por campaña",
-                description="Barras horizontales recibidas/atendidas por campaña",
+                title="Distribuci\u00f3n por campa\u00f1a",
+                description="Barras horizontales recibidas/atendidas por campa\u00f1a",
             ),
             ChartDefinition(
                 id="campaign_share",
                 chart_type="donut",
-                title="Participación por campaña",
-                description="Donut con % de participación de cada campaña",
+                title="Participaci\u00f3n por campa\u00f1a",
+                description="Donut con % de participaci\u00f3n de cada campa\u00f1a",
             ),
             ChartDefinition(
                 id="monthly_evolution",
                 chart_type="grouped_bar_line",
-                title="Evolución mensual {year}",
-                description="Tendencia mensual Ene–Dic con barras y línea NA",
+                title="Evoluci\u00f3n mensual {year}",
+                description="Tendencia mensual Ene\u2013Dic con barras y l\u00ednea NA",
             ),
             ChartDefinition(
                 id="skill_volume_top10",
@@ -176,19 +176,19 @@ class ContactCenterPlugin(ReportPlugin):
             ChartDefinition(
                 id="outbound_result",
                 chart_type="vertical_bar",
-                title="Distribución por resultado",
+                title="Distribuci\u00f3n por resultado",
                 description="Llamadas salientes por resultado (Conectado, No llama, etc.)",
             ),
             ChartDefinition(
                 id="outbound_daily",
                 chart_type="vertical_bar",
-                title="Distribución diaria — Llamadas salientes",
+                title="Distribuci\u00f3n diaria \u2014 Llamadas salientes",
                 description="Volumen diario de llamadas salientes",
             ),
         ]
 
     # ------------------------------------------------------------------
-    # Campaign ↔ Skill mapping
+    # Campaign \u2194 Skill mapping
     # ------------------------------------------------------------------
 
     def get_campaign_mapping(self) -> dict[str, list[str]]:
@@ -218,7 +218,7 @@ class ContactCenterPlugin(ReportPlugin):
                 "Conmutador",
                 "RechazoComm",
             ],
-            "Plan Médico": [
+            "Plan M\u00e9dico": [
                 "PM_Consultas",
                 "0800_coca_cola",
             ],
@@ -241,31 +241,31 @@ class ContactCenterPlugin(ReportPlugin):
     def get_prompts(self) -> PromptConfig:
         return PromptConfig(
             executive_summary=(
-                "Sos un analista de datos del Hospital Alemán. "
-                "Redactá un resumen ejecutivo de máximo 4 oraciones sobre la "
+                "Sos un analista de datos del Hospital Alem\u00e1n. "
+                "Redact\u00e1 un resumen ejecutivo de m\u00e1ximo 4 oraciones sobre la "
                 "productividad del Contact Center del mes de {period}. "
                 "Basate exclusivamente en los siguientes KPIs:\n\n{kpi_summary}\n\n"
-                "Mencioná las variaciones más relevantes respecto al mes anterior. "
-                "Usá tono profesional y neutro. No inventes datos."
+                "Mencion\u00e1 las variaciones m\u00e1s relevantes respecto al mes anterior. "
+                "Us\u00e1 tono profesional y neutro. No inventes datos."
             ),
             conclusions=(
                 "En base a los datos del Contact Center de {period}:\n\n"
                 "{kpi_summary}\n\n"
-                "Redactá 3 a 5 conclusiones breves y concretas. "
-                "Si algún indicador está por debajo del objetivo (NA < 85%), "
-                "mencionalo explícitamente. No inventes datos."
+                "Redact\u00e1 3 a 5 conclusiones breves y concretas. "
+                "Si alg\u00fan indicador est\u00e1 por debajo del objetivo (NA < 85%), "
+                "mencionalo expl\u00edcitamente. No inventes datos."
             ),
             recommendations=(
                 "En base a las conclusiones del Contact Center de {period}:\n\n"
                 "{conclusions}\n\n"
-                "Proponé 3 a 5 recomendaciones accionables para mejorar "
-                "los indicadores. Sé específico y práctico."
+                "Propon\u00e9 3 a 5 recomendaciones accionables para mejorar "
+                "los indicadores. S\u00e9 espec\u00edfico y pr\u00e1ctico."
             ),
             anomaly_detection=(
-                "Analizá los siguientes datos diarios del Contact Center "
-                "de {period} e identificá cualquier anomalía, pico inusual, "
-                "o patrón fuera de lo normal:\n\n{daily_data}\n\n"
-                "Si no hay anomalías, indicalo. No inventes datos."
+                "Analiz\u00e1 los siguientes datos diarios del Contact Center "
+                "de {period} e identific\u00e1 cualquier anomal\u00eda, pico inusual, "
+                "o patr\u00f3n fuera de lo normal:\n\n{daily_data}\n\n"
+                "Si no hay anomal\u00edas, indicalo. No inventes datos."
             ),
         )
 

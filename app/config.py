@@ -70,7 +70,7 @@ class ReportConfig(BaseModel):
     accent_color: str = "#4CAF50"
     negative_color: str = "#E74C3C"
     font_family: str = "Calibri"
-    page_footer_left: str = "Hospital Alemán · Fuente: Tecnovoz"
+    page_footer_left: str = "Hospital Alem\u00e1n \u00b7 Fuente: Tecnovoz"
 
 
 # ---------------------------------------------------------------------------
@@ -108,5 +108,5 @@ class Settings(BaseModel):
         return cls.model_validate(raw)
 
 
-# Module-level singleton — imported by other modules as ``from app.config import settings``.
+# Module-level singleton \u2014 imported by other modules as ``from app.config import settings``.
 settings = Settings.load()

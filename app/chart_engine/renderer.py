@@ -1,4 +1,4 @@
-"""Chart renderer — generates all chart types for the CC report.
+"""Chart renderer \u2014 generates all chart types for the CC report.
 
 Every function returns a ``matplotlib.figure.Figure`` that can be saved
 to PNG or embedded in a report.  The caller is responsible for calling
@@ -48,20 +48,20 @@ apply_global_style()
 
 
 # ======================================================================
-# 1. Daily distribution — bar + line (pages 3, 4, 7-11)
+# 1. Daily distribution \u2014 bar + line (pages 3, 4, 7-11)
 # ======================================================================
 
 def chart_daily_distribution(
     df: pd.DataFrame,
-    title: str = "Distribución diaria",
+    title: str = "Distribuci\u00f3n diaria",
     *,
     date_col: str = "date",
     recibidas_col: str = "TOTALCALLS",
     atendidas_col: str = "TRANSFER",
     na_col: str = "PCTATT",
-    figsize: tuple[float, float] = (FIG_WIDTH, FIG_HEIGHT),
+    figsize: tuple[float, float] = (FIG_WIDTH, 4.8),
 ) -> plt.Figure:
-    """Bar chart with Recibidas/Atendidas bars and Nivel de Atención line."""
+    """Bar chart with Recibidas/Atendidas bars and Nivel de Atenci\u00f3n line."""
 
     df = df.sort_values(date_col).reset_index(drop=True)
     x = np.arange(len(df))
@@ -88,7 +88,7 @@ def chart_daily_distribution(
     ax2 = ax1.twinx()
     na_values = pd.to_numeric(df[na_col], errors="coerce")
     ax2.plot(x, na_values, color=GREEN_LINE, marker="o", markersize=4,
-             linewidth=1.8, label="Nivel de Atención", zorder=4)
+             linewidth=1.8, label="Nivel de Atenci\u00f3n", zorder=4)
     ax2.set_ylim(0, 105)
     ax2.yaxis.set_major_formatter(mticker.PercentFormatter())
     ax2.tick_params(axis="y", labelsize=TICK_SIZE)
@@ -105,15 +105,19 @@ def chart_daily_distribution(
     # Legend
     lines1, labels1 = ax1.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
-    ax1.legend(lines1 + lines2, labels1 + labels2,
-               loc="lower center", bbox_to_anchor=(0.5, -0.22), ncol=3)
 
+    # Reserve room at the bottom for the rotated date labels, then put the
+    # legend underneath them (figure coordinates) so the two never collide.
     fig.tight_layout()
+    fig.subplots_adjust(bottom=0.30)
+    fig.legend(lines1 + lines2, labels1 + labels2,
+               loc="lower center", bbox_to_anchor=(0.5, 0.005),
+               ncol=3, frameon=False)
     return fig
 
 
 # ======================================================================
-# 2. Grouped bar + line — weekday / monthly (pages 5, 12)
+# 2. Grouped bar + line \u2014 weekday / monthly (pages 5, 12)
 # ======================================================================
 
 def chart_grouped_bar_line(
@@ -121,14 +125,14 @@ def chart_grouped_bar_line(
     recibidas: Sequence[float],
     atendidas: Sequence[float],
     nivel_atencion: Sequence[float],
-    title: str = "Distribución por día de semana",
+    title: str = "Distribuci\u00f3n por d\u00eda de semana",
     *,
     show_data_labels: bool = True,
     show_na_labels: bool = True,
     y_na_min: float = 50.0,
     figsize: tuple[float, float] = (FIG_WIDTH, FIG_HEIGHT),
 ) -> plt.Figure:
-    """Grouped bars (Rec/Att) with Nivel de Atención line overlay."""
+    """Grouped bars (Rec/Att) with Nivel de Atenci\u00f3n line overlay."""
 
     x = np.arange(len(labels))
     fig, ax1 = plt.subplots(figsize=figsize)
@@ -154,7 +158,7 @@ def chart_grouped_bar_line(
     # NA line
     ax2 = ax1.twinx()
     ax2.plot(x, nivel_atencion, color=GREEN_LINE, marker="o", markersize=5,
-             linewidth=2.0, label="Nivel de Atención", zorder=4)
+             linewidth=2.0, label="Nivel de Atenci\u00f3n", zorder=4)
     ax2.set_ylim(y_na_min, 100)
     ax2.yaxis.set_major_formatter(mticker.PercentFormatter())
     ax2.spines["right"].set_visible(True)
@@ -173,22 +177,24 @@ def chart_grouped_bar_line(
 
     lines1, labels1 = ax1.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
-    ax1.legend(lines1 + lines2, labels1 + labels2,
-               loc="lower center", bbox_to_anchor=(0.5, -0.18), ncol=3)
 
     fig.tight_layout()
+    fig.subplots_adjust(bottom=0.22)
+    fig.legend(lines1 + lines2, labels1 + labels2,
+               loc="lower center", bbox_to_anchor=(0.5, 0.005),
+               ncol=3, frameon=False)
     return fig
 
 
 # ======================================================================
-# 3. Horizontal bar chart — campaign volume / skills top-10 (pages 6, 14)
+# 3. Horizontal bar chart \u2014 campaign volume / skills top-10 (pages 6, 14)
 # ======================================================================
 
 def chart_horizontal_bars(
     labels: Sequence[str],
     recibidas: Sequence[float],
     atendidas: Sequence[float],
-    title: str = "Distribución por campaña",
+    title: str = "Distribuci\u00f3n por campa\u00f1a",
     *,
     figsize: tuple[float, float] = (FIG_WIDTH, HBAR_FIG_HEIGHT),
 ) -> plt.Figure:
@@ -224,13 +230,13 @@ def chart_horizontal_bars(
 
 
 # ======================================================================
-# 4. Donut chart — campaign share (page 6)
+# 4. Donut chart \u2014 campaign share (page 6)
 # ======================================================================
 
 def chart_donut(
     labels: Sequence[str],
     values: Sequence[float],
-    title: str = "Participación por campaña",
+    title: str = "Participaci\u00f3n por campa\u00f1a",
     center_label: str = "",
     center_value: str = "",
     *,
@@ -280,7 +286,7 @@ def chart_donut(
 
 
 # ======================================================================
-# 5. Simple vertical bar chart — outbound calls (page 13)
+# 5. Simple vertical bar chart \u2014 outbound calls (page 13)
 # ======================================================================
 
 def chart_vertical_bars(
@@ -344,14 +350,14 @@ def save_chart(fig: plt.Figure, path: Path, close: bool = True) -> Path:
 # ======================================================================
 
 def _format_thousands(value: float, _pos: int = 0) -> str:
-    """Format axis ticks: 1000 → '1.000'."""
+    """Format axis ticks: 1000 \u2192 '1.000'."""
     if value >= 1000:
         return f"{int(value):,}".replace(",", ".")
     return str(int(value))
 
 
 def _fmt_int(value: float) -> str:
-    """Format a number as integer with dot-thousands: 14552 → '14.552'."""
+    """Format a number as integer with dot-thousands: 14552 \u2192 '14.552'."""
     return f"{int(value):,}".replace(",", ".")
 
 

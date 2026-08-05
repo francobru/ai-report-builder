@@ -1,9 +1,9 @@
 """Skill name extraction and campaign mapping.
 
 Handles filenames like:
-    'Turnos PM Estudios_jun26.csv'  → skill 'Turnos PM Estudios'  → campaign 'Turnos'
-    'PM Consultas_may26.csv'        → skill 'PM Consultas'        → campaign 'Plan Médico'
-    'Conmutador_jun26.csv'          → skill 'Conmutador'          → campaign 'Conmutador'
+    'Turnos PM Estudios_jun26.csv'  \u2192 skill 'Turnos PM Estudios'  \u2192 campaign 'Turnos'
+    'PM Consultas_may26.csv'        \u2192 skill 'PM Consultas'        \u2192 campaign 'Plan M\u00e9dico'
+    'Conmutador_jun26.csv'          \u2192 skill 'Conmutador'          \u2192 campaign 'Conmutador'
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ _MONTH_MAP = {
 
 
 # ======================================================================
-# Campaign → Skills mapping
+# Campaign \u2192 Skills mapping
 # ======================================================================
 # Keys are campaign names as shown in the report.
 # Values are lists of skill names as they appear in CSV filenames
@@ -43,7 +43,7 @@ CAMPAIGN_MAPPING: dict[str, list[str]] = {
         "Gipfel Cober",
         "Gipfel PM",
         "Donacion",
-        "Donación",
+        "Donaci\u00f3n",
         "0800 onco",
         "Osde 210",
         "TelePerfomance",
@@ -53,13 +53,13 @@ CAMPAIGN_MAPPING: dict[str, list[str]] = {
     "Conmutador": [
         "Conmutador",
         "Busqueda Personas",
-        "Búsqueda Personas",
+        "B\u00fasqueda Personas",
         "Camilleros",
         "Sede Caballito",
         "RechazoComm",
         "RechazoConm",
     ],
-    "Plan Médico": [
+    "Plan M\u00e9dico": [
         "PM Consultas",
         "0800 coca cola",
     ],
@@ -69,14 +69,14 @@ CAMPAIGN_MAPPING: dict[str, list[str]] = {
     ],
     "Agendas": [
         "Agendas medicas",
-        "Agendas médicas",
+        "Agendas m\u00e9dicas",
     ],
     "Camp HA": [
         "Camp HA",
     ],
 }
 
-# Build reverse lookup: normalized skill name → campaign name
+# Build reverse lookup: normalized skill name \u2192 campaign name
 _SKILL_TO_CAMPAIGN: dict[str, str] = {}
 for _camp, _skills in CAMPAIGN_MAPPING.items():
     for _sk in _skills:
@@ -86,7 +86,7 @@ for _camp, _skills in CAMPAIGN_MAPPING.items():
 GIPFEL_SKILLS = {"gipfel cober", "gipfel pm"}
 
 # Campaign display order (as in the report)
-CAMPAIGN_ORDER = ["Conmutador", "Plan Médico", "Portal", "Turnos", "Agendas"]
+CAMPAIGN_ORDER = ["Conmutador", "Plan M\u00e9dico", "Portal", "Turnos", "Agendas"]
 
 
 # ======================================================================
@@ -98,10 +98,10 @@ def extract_skill_name(filename: str) -> str:
 
     Examples::
 
-        'Turnos PM Estudios_jun26.csv'  → 'Turnos PM Estudios'
-        'PM Consultas_may26.csv'        → 'PM Consultas'
-        'PM_Consultas_may26.csv'        → 'PM Consultas'
-        'Conmutador_jun26'              → 'Conmutador'
+        'Turnos PM Estudios_jun26.csv'  \u2192 'Turnos PM Estudios'
+        'PM Consultas_may26.csv'        \u2192 'PM Consultas'
+        'PM_Consultas_may26.csv'        \u2192 'PM Consultas'
+        'Conmutador_jun26'              \u2192 'Conmutador'
     """
     # Remove extension
     name = filename
@@ -127,7 +127,7 @@ def extract_period(filename: str) -> tuple[str, int, int] | None:
 
     Example::
 
-        'PM Consultas_may26.csv' → ('Mayo 2026', 5, 2026)
+        'PM Consultas_may26.csv' \u2192 ('Mayo 2026', 5, 2026)
     """
     match = _MONTH_PATTERN.search(filename.replace(".csv", ""))
     if not match:

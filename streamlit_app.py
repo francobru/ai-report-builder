@@ -1,10 +1,10 @@
-"""AI Report Builder v1.9 — Aplicación Web.
+"""AI Report Builder v1.9 \u2014 Aplicaci\u00f3n Web.
 
 Cambios v1.9:
-- Selector de habilidades (podés incluir/excluir cada una)
-- Promedio diario correcto (total / días con actividad)
-- Slide de Datos Generales rediseñada (2 filas, tarjetas grandes centradas)
-- Anexos con tablas diarias por campaña
+- Selector de habilidades (pod\u00e9s incluir/excluir cada una)
+- Promedio diario correcto (total / d\u00edas con actividad)
+- Slide de Datos Generales redise\u00f1ada (2 filas, tarjetas grandes centradas)
+- Anexos con tablas diarias por campa\u00f1a
 """
 
 import sys
@@ -41,7 +41,7 @@ kpi_defs = plugin.get_kpis()
 # ======================================================================
 # Page config
 # ======================================================================
-st.set_page_config(page_title="AI Report Builder", page_icon="📊", layout="wide")
+st.set_page_config(page_title="AI Report Builder", page_icon="\U0001f4ca", layout="wide")
 
 st.markdown("""
 <style>
@@ -75,34 +75,34 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 CAMP_BADGE = {"Turnos": "badge-turnos", "Conmutador": "badge-conmutador",
-              "Plan Médico": "badge-plan", "Portal": "badge-portal",
+              "Plan M\u00e9dico": "badge-plan", "Portal": "badge-portal",
               "Agendas": "badge-agendas", "Camp HA": "badge-campha",
               "Sin asignar": "badge-sin"}
 
 st.markdown("""
 <div class="main-header">
-    <h1>📊 AI Report Builder</h1>
-    <p>Hospital Alemán · Productividad del Contact Center</p>
+    <h1>\U0001f4ca AI Report Builder</h1>
+    <p>Hospital Alem\u00e1n \u00b7 Productividad del Contact Center</p>
 </div>""", unsafe_allow_html=True)
 
-# Version banner — lets you confirm at a glance which version is deployed
-APP_VERSION = "1.9.2"
-st.caption(f"Versión {APP_VERSION} · Incluye: consultas sobre los datos · salida PDF · resumen automático")
+# Version banner \u2014 lets you confirm at a glance which version is deployed
+APP_VERSION = "2.0.2"
+st.caption(f"Versi\u00f3n {APP_VERSION} \u00b7 Incluye: consultas sobre los datos \u00b7 salida PDF \u00b7 resumen autom\u00e1tico")
 
 with st.sidebar:
-    st.markdown("### ⚙️ Configuración")
+    st.markdown("### \u2699\ufe0f Configuraci\u00f3n")
     st.selectbox("Tipo de reporte", ["Productividad del Contact Center"])
     st.divider()
-    st.markdown("### 📋 Instrucciones")
+    st.markdown("### \U0001f4cb Instrucciones")
     st.markdown(
-        "1. Subí los **CSVs del mes actual**\n"
-        "2. *(Opcional)* Subí también los del **mes anterior**\n"
-        "3. **Seleccioná** las habilidades a incluir\n"
-        "4. Revisá los KPIs\n"
-        "5. Descargá el PPTX"
+        "1. Sub\u00ed los **CSVs del mes actual**\n"
+        "2. *(Opcional)* Sub\u00ed tambi\u00e9n los del **mes anterior**\n"
+        "3. **Seleccion\u00e1** las habilidades a incluir\n"
+        "4. Revis\u00e1 los KPIs\n"
+        "5. Descarg\u00e1 el PPTX"
     )
     st.divider()
-    st.markdown("### 🤖 Resumen con IA")
+    st.markdown("### \U0001f916 Resumen con IA")
     st.caption("Opcional. Genera resumen ejecutivo y conclusiones.")
     _default_key = ""
     try:
@@ -111,32 +111,32 @@ with st.sidebar:
         pass
     api_key_input = st.text_input(
         "API key de Anthropic", value=_default_key, type="password",
-        help="Se obtiene en console.anthropic.com. Si no la cargás, el reporte se genera igual pero sin los textos de IA.",
+        help="Se obtiene en console.anthropic.com. Si no la carg\u00e1s, el reporte se genera igual pero sin los textos de IA.",
     )
     st.divider()
-    st.caption(f"v{APP_VERSION} · Selección + anexos + salientes + tendencia")
+    st.caption(f"v{APP_VERSION} \u00b7 Selecci\u00f3n + anexos + salientes + tendencia")
 
 # ======================================================================
 # Step 1: Upload
 # ======================================================================
-st.markdown('<h3 class="step-header">1 · Subir archivos CSV</h3>', unsafe_allow_html=True)
+st.markdown('<h3 class="step-header">1 \u00b7 Subir archivos CSV</h3>', unsafe_allow_html=True)
 
 col_cur, col_prev = st.columns(2)
 with col_cur:
-    st.markdown("**📁 Mes actual** (obligatorio)")
+    st.markdown("**\U0001f4c1 Mes actual** (obligatorio)")
     current_files = st.file_uploader("CSVs del mes a reportar", type=["csv"],
                                       accept_multiple_files=True, key="current")
 with col_prev:
-    st.markdown("**📁 Mes anterior** (opcional, para variaciones)")
+    st.markdown("**\U0001f4c1 Mes anterior** (opcional, para variaciones)")
     previous_files = st.file_uploader("CSVs del mes anterior", type=["csv"],
                                        accept_multiple_files=True, key="previous")
 
-st.markdown("**📞 Llamadas salientes** (opcional, archivo aparte)")
+st.markdown("**\U0001f4de Llamadas salientes** (opcional, archivo aparte)")
 outbound_file = st.file_uploader("CSV de llamadas salientes", type=["csv"],
                                   accept_multiple_files=False, key="outbound")
 
 if not current_files:
-    st.info("👆 Subí los archivos CSV del mes que querés reportar.")
+    st.info("\U0001f446 Sub\u00ed los archivos CSV del mes que quer\u00e9s reportar.")
     st.stop()
 
 # ======================================================================
@@ -158,7 +158,7 @@ def load_file_set(uploaded_files):
             dfs[skill] = load_csv(Path(tmp.name), schema=schema)
         except Exception as e:
             st.error(f"Error cargando {uf.name}: {e}")
-    return dfs, period_label or "Período desconocido"
+    return dfs, period_label or "Per\u00edodo desconocido"
 
 
 all_current_dfs, current_period = load_file_set(current_files)
@@ -167,7 +167,7 @@ prev_dfs, prev_period = (({}, None) if not previous_files else load_file_set(pre
 # ======================================================================
 # Step 2: Skill selection
 # ======================================================================
-st.markdown('<h3 class="step-header">2 · Seleccionar habilidades a incluir</h3>', unsafe_allow_html=True)
+st.markdown('<h3 class="step-header">2 \u00b7 Seleccionar habilidades a incluir</h3>', unsafe_allow_html=True)
 
 # Init session state for selections
 if "skill_selection" not in st.session_state:
@@ -183,12 +183,12 @@ if st.session_state.get("_skills_key") != skills_key:
 # Bulk action buttons
 col_all, col_none, col_info = st.columns([1, 1, 3])
 with col_all:
-    if st.button("✅ Seleccionar todas", use_container_width=True):
+    if st.button("\u2705 Seleccionar todas", use_container_width=True):
         for s in all_skills:
             st.session_state.skill_selection[s] = True
         st.rerun()
 with col_none:
-    if st.button("❌ Deseleccionar todas", use_container_width=True):
+    if st.button("\u274c Deseleccionar todas", use_container_width=True):
         for s in all_skills:
             st.session_state.skill_selection[s] = False
         st.rerun()
@@ -226,7 +226,7 @@ current_dfs = {s: df for s, df in all_current_dfs.items()
                if st.session_state.skill_selection.get(s, False)}
 
 if not current_dfs:
-    st.warning("⚠️ No hay habilidades seleccionadas. Marcá al menos una para generar el reporte.")
+    st.warning("\u26a0\ufe0f No hay habilidades seleccionadas. Marc\u00e1 al menos una para generar el reporte.")
     st.stop()
 
 # ======================================================================
@@ -240,21 +240,28 @@ global_kpis = compute_kpis(all_current, kpi_defs)
 global_ng_kpis = compute_kpis(all_no_gipfel, kpi_defs) if len(all_no_gipfel) > 0 else None
 
 # Variations
+# The variation compares FULL month totals against FULL month totals, so it
+# always matches the figure shown on the KPI card. (Filtering the baseline to
+# only the skills common to both months made the percentage disagree with a
+# hand calculation done from the report totals.)
 global_variations = {}
 global_ng_variations = {}
+solo_mes_anterior = []
+solo_mes_actual = []
 if prev_dfs:
-    prev_selected = {s: df for s, df in prev_dfs.items() if s in current_dfs}
-    if prev_selected:
-        all_prev = pd.concat([df.assign(_skill=n) for n, df in prev_selected.items()],
-                              ignore_index=True)
-        prev_kpis = compute_kpis(all_prev, kpi_defs)
-        global_variations = compute_variation(global_kpis, prev_kpis)
+    solo_mes_anterior = sorted(set(prev_dfs) - set(current_dfs))
+    solo_mes_actual = sorted(set(current_dfs) - set(prev_dfs))
 
-        # Same comparison but excluding Gipfel skills, for the "sin Gipfel" slide
-        prev_ng = all_prev[~all_prev["_skill"].str.lower().isin(GIPFEL_SKILLS)]
-        if global_ng_kpis is not None and len(prev_ng) > 0:
-            prev_ng_kpis = compute_kpis(prev_ng, kpi_defs)
-            global_ng_variations = compute_variation(global_ng_kpis, prev_ng_kpis)
+    all_prev = pd.concat([df.assign(_skill=n) for n, df in prev_dfs.items()],
+                          ignore_index=True)
+    prev_kpis = compute_kpis(all_prev, kpi_defs)
+    global_variations = compute_variation(global_kpis, prev_kpis)
+
+    # Same comparison but excluding Gipfel skills, for the "sin Gipfel" slide
+    prev_ng = all_prev[~all_prev["_skill"].str.lower().isin(GIPFEL_SKILLS)]
+    if global_ng_kpis is not None and len(prev_ng) > 0:
+        prev_ng_kpis = compute_kpis(prev_ng, kpi_defs)
+        global_ng_variations = compute_variation(global_ng_kpis, prev_ng_kpis)
 
 # Per-campaign KPIs + variations
 classification = {}
@@ -275,7 +282,9 @@ for camp_name in CAMPAIGN_ORDER + ["Camp HA"]:
     campaign_kpis[camp_name] = compute_kpis(camp_df, kpi_defs)
 
     if prev_dfs:
-        prev_skills = [s for s in skills if s in prev_dfs]
+        # All skills of this campaign that exist in the previous month,
+        # regardless of whether they were also uploaded for the current one.
+        prev_skills = [s for s in prev_dfs if find_campaign(s) == camp_name]
         if prev_skills:
             prev_camp_df = pd.concat([prev_dfs[s] for s in prev_skills], ignore_index=True)
             prev_camp_kpis = compute_kpis(prev_camp_df, kpi_defs)
@@ -287,17 +296,28 @@ skill_kpis = {n: compute_kpis(df, kpi_defs) for n, df in current_dfs.items()}
 # ======================================================================
 # Step 3: KPIs
 # ======================================================================
-st.markdown('<h3 class="step-header">3 · Indicadores</h3>', unsafe_allow_html=True)
+st.markdown('<h3 class="step-header">3 \u00b7 Indicadores</h3>', unsafe_allow_html=True)
+
+if prev_dfs and (solo_mes_anterior or solo_mes_actual):
+    _msg = []
+    if solo_mes_anterior:
+        _msg.append(f"solo en {prev_period}: {', '.join(solo_mes_anterior)}")
+    if solo_mes_actual:
+        _msg.append(f"solo en {current_period}: {', '.join(solo_mes_actual)}")
+    st.info("Las habilidades no coinciden entre los dos meses (" + "; ".join(_msg) +
+            "). Las variaciones comparan el total completo de cada mes, "
+            "as\u00ed que coinciden con los KPIs mostrados.")
+
 
 def render_kpi_card(label, value, color, variation=None):
     var_html = ""
-    if variation and variation.get("formatted", "—") != "—":
+    if variation and variation.get("formatted", "\u2014") != "\u2014":
         css = "kpi-var-up" if variation["direction"] == "up" else "kpi-var-down"
         var_html = f'<div class="{css}">{variation["formatted"]}</div>'
     return (f'<div class="kpi-card"><div class="kpi-label">{label}</div>'
             f'<div class="kpi-value" style="color:{color}">{value}</div>{var_html}</div>')
 
-st.markdown(f"#### Todas las campañas seleccionadas — {current_period}"
+st.markdown(f"#### Todas las campa\u00f1as seleccionadas \u2014 {current_period}"
             + (f" vs {prev_period}" if prev_dfs else ""))
 
 # Row 1: 2 big cards
@@ -322,7 +342,7 @@ with cols_bot[1]:
                                  global_kpis["promedio_atendidas"]["formatted"],
                                  "#7F8C8D"), unsafe_allow_html=True)
 with cols_bot[2]:
-    st.markdown(render_kpi_card("Nivel de Atención",
+    st.markdown(render_kpi_card("Nivel de Atenci\u00f3n",
                                  global_kpis["nivel_atencion"]["formatted"],
                                  "#4CAF50", global_variations.get("nivel_atencion")),
                 unsafe_allow_html=True)
@@ -332,34 +352,34 @@ st.markdown("")
 time_cols = st.columns(3)
 for col, kid, lab in zip(time_cols,
     ["tiempo_conversacion", "tiempo_demora", "tiempo_abandono"],
-    ["Conversación", "Demora", "Abandono"]):
+    ["Conversaci\u00f3n", "Demora", "Abandono"]):
     with col:
         st.markdown(render_kpi_card(lab, global_kpis[kid]["formatted"], "#1B3A5C"),
                     unsafe_allow_html=True)
 
 # Campaign KPIs
-with st.expander("📊 KPIs por campaña" + (" (con variaciones)" if prev_dfs else ""), expanded=True):
+with st.expander("\U0001f4ca KPIs por campa\u00f1a" + (" (con variaciones)" if prev_dfs else ""), expanded=True):
     for camp_name in CAMPAIGN_ORDER + ["Camp HA"]:
         if camp_name not in campaign_kpis:
             continue
         ck = campaign_kpis[camp_name]
         cv = campaign_variations.get(camp_name, {})
-        parts = [f"**{camp_name}** —"]
+        parts = [f"**{camp_name}** \u2014"]
         for kid, lab in [("recibidas", "Rec"), ("atendidas", "At"), ("nivel_atencion", "NA")]:
             val = ck[kid]["formatted"]
             vr = cv.get(kid, {}).get("formatted", "")
             arrow = ""
-            if vr and "▲" in vr: arrow = "🟢"
-            elif vr and "▼" in vr: arrow = "🔴"
+            if vr and "\u25b2" in vr: arrow = "\U0001f7e2"
+            elif vr and "\u25bc" in vr: arrow = "\U0001f534"
             parts.append(f"{lab}: **{val}**{' ' + arrow + ' ' + vr if vr else ''}")
-        st.markdown(" · ".join(parts))
+        st.markdown(" \u00b7 ".join(parts))
 
-with st.expander("📋 Detalle por habilidad", expanded=False):
+with st.expander("\U0001f4cb Detalle por habilidad", expanded=False):
     rows = []
     for name in sorted(current_dfs.keys(), key=lambda n: -skill_kpis[n]["recibidas"]["value"]):
         sk = skill_kpis[name]
         rows.append({
-            "Habilidad": name, "Campaña": find_campaign(name),
+            "Habilidad": name, "Campa\u00f1a": find_campaign(name),
             "Recibidas": sk["recibidas"]["formatted"],
             "Atendidas": sk["atendidas"]["formatted"],
             "NA": sk["nivel_atencion"]["formatted"],
@@ -402,7 +422,7 @@ def build_annex_rows(daily_df):
 # ======================================================================
 # Step 4: Charts
 # ======================================================================
-st.markdown('<h3 class="step-header">4 · Generar reporte</h3>', unsafe_allow_html=True)
+st.markdown('<h3 class="step-header">4 \u00b7 Generar reporte</h3>', unsafe_allow_html=True)
 
 chart_dir = Path(tempfile.mkdtemp())
 chart_images = {}
@@ -413,8 +433,8 @@ for camp_name, camp_df in campaign_dfs.items():
     daily = aggregate_daily(camp_df)
     if len(daily) > 0:
         daily_by_campaign[camp_name] = daily
-        key = f"daily_{camp_name.lower().replace(' ', '_').replace('é', 'e')}"
-        fig = chart_daily_distribution(daily, title=f"Distribución diaria — {camp_name}")
+        key = f"daily_{camp_name.lower().replace(' ', '_').replace('\u00e9', 'e')}"
+        fig = chart_daily_distribution(daily, title=f"Distribuci\u00f3n diaria \u2014 {camp_name}")
         chart_images[key] = str(save_chart(fig, chart_dir / f"{key}.png"))
         plt.close(fig)
 
@@ -422,7 +442,7 @@ for camp_name, camp_df in campaign_dfs.items():
 daily_all = aggregate_daily(all_current)
 if len(daily_all) > 0:
     fig = chart_daily_distribution(daily_all,
-                                    title="Distribución diaria — Todas las campañas")
+                                    title="Distribuci\u00f3n diaria \u2014 Todas las campa\u00f1as")
     chart_images["daily_all"] = str(save_chart(fig, chart_dir / "daily_all.png"))
     plt.close(fig)
 
@@ -430,7 +450,7 @@ if len(daily_all) > 0:
 daily_ng = aggregate_daily(all_no_gipfel)
 if len(daily_ng) > 0:
     fig = chart_daily_distribution(daily_ng,
-                                    title="Distribución diaria — Todas las campañas (sin Gipfel)")
+                                    title="Distribuci\u00f3n diaria \u2014 Todas las campa\u00f1as (sin Gipfel)")
     chart_images["daily_all_no_gipfel"] = str(save_chart(fig, chart_dir / "daily_ng.png"))
     plt.close(fig)
 
@@ -442,9 +462,9 @@ if len(daily_all) > 0:
     wk = wk.reindex(range(7), fill_value=0)
     wk["na"] = (wk["att"] / wk["rec"].replace(0, 1) * 100).round(2)
     fig = chart_grouped_bar_line(
-        ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"],
+        ["lun", "mar", "mi\u00e9", "jue", "vie", "s\u00e1b", "dom"],
         wk["rec"].tolist(), wk["att"].tolist(), wk["na"].tolist(),
-        title="Distribución por día de semana")
+        title="Distribuci\u00f3n por d\u00eda de semana")
     chart_images["weekday_distribution"] = str(save_chart(fig, chart_dir / "weekday.png"))
     plt.close(fig)
 
@@ -454,7 +474,7 @@ if camp_sorted:
     rec = [campaign_kpis[c]["recibidas"]["value"] for c in camp_sorted]
     att = [campaign_kpis[c]["atendidas"]["value"] for c in camp_sorted]
     # Horizontal bars include ALL campaigns (Agendas, Camp HA too)
-    fig = chart_horizontal_bars(camp_sorted, rec, att, title="Distribución por campaña")
+    fig = chart_horizontal_bars(camp_sorted, rec, att, title="Distribuci\u00f3n por campa\u00f1a")
     chart_images["campaign_volume"] = str(save_chart(fig, chart_dir / "camp_vol.png"))
     plt.close(fig)
 
@@ -464,7 +484,7 @@ if camp_sorted:
     donut_rec = [campaign_kpis[c]["recibidas"]["value"] for c in donut_campaigns]
     donut_total = int(sum(donut_rec))
     total_str = f"{donut_total:,}".replace(",", ".")
-    fig = chart_donut(donut_campaigns, donut_rec, title="Participación por campaña",
+    fig = chart_donut(donut_campaigns, donut_rec, title="Participaci\u00f3n por campa\u00f1a",
                       center_value=total_str, center_label="Total recibidas")
     chart_images["campaign_share"] = str(save_chart(fig, chart_dir / "camp_share.png"))
     plt.close(fig)
@@ -480,7 +500,7 @@ if top_skills:
     chart_images["skill_volume_top10"] = str(save_chart(fig, chart_dir / "skill_top10.png"))
     plt.close(fig)
 
-# ---- Monthly trend (evolución mensual) ----
+# ---- Monthly trend (evoluci\u00f3n mensual) ----
 from app.data_loader.monthly_history import get_trend, add_month
 from app.data_loader.skill_mapper import extract_period as _extract_period_full
 
@@ -512,7 +532,7 @@ if _period_info:
             [r["recibidas"] for r in monthly_trend_data],
             [r["atendidas"] for r in monthly_trend_data],
             [r["nivel_atencion"] for r in monthly_trend_data],
-            title=f"Evolución mensual {cur_year}",
+            title=f"Evoluci\u00f3n mensual {cur_year}",
             y_na_min=60.0)
         chart_images["monthly_evolution"] = str(save_chart(fig, chart_dir / "monthly.png"))
         plt.close(fig)
@@ -540,7 +560,7 @@ if outbound_file is not None:
         if ob_agg["by_result"]:
             results = list(ob_agg["by_result"].keys())
             counts = list(ob_agg["by_result"].values())
-            fig = chart_vertical_bars(results, counts, title="Distribución por resultado")
+            fig = chart_vertical_bars(results, counts, title="Distribuci\u00f3n por resultado")
             chart_images["outbound_result"] = str(save_chart(fig, chart_dir / "ob_result.png"))
             plt.close(fig)
 
@@ -552,23 +572,23 @@ if outbound_file is not None:
             labels = [f"{pd.Timestamp(d).day}-{month_names.get(pd.Timestamp(d).month,'?')}"
                       for d in daily_ob["date"]]
             fig = chart_vertical_bars(labels, daily_ob["count"].tolist(),
-                                      title="Distribución diaria — Llamadas salientes")
+                                      title="Distribuci\u00f3n diaria \u2014 Llamadas salientes")
             chart_images["outbound_daily"] = str(save_chart(fig, chart_dir / "ob_daily.png"))
             plt.close(fig)
 
-        st.success(f"📞 Llamadas salientes cargadas: {ob_agg['total']:,} llamadas".replace(",", "."))
+        st.success(f"\U0001f4de Llamadas salientes cargadas: {ob_agg['total']:,} llamadas".replace(",", "."))
     except Exception as e:
         st.error(f"Error al procesar llamadas salientes: {e}")
 
 # ---- Consultas sobre los datos ----
 from app.ai_engine.query_engine import answer_question
 
-with st.expander("🔎 Consultar los datos", expanded=False):
-    st.caption("Preguntá en lenguaje natural. Por ejemplo: "
-               "*cuántas llamadas atendidas el 15 de junio en Turnos PM Estudios*")
+with st.expander("\U0001f50e Consultar los datos", expanded=False):
+    st.caption("Pregunt\u00e1 en lenguaje natural. Por ejemplo: "
+               "*cu\u00e1ntas llamadas atendidas el 15 de junio en Turnos PM Estudios*")
 
     pregunta = st.text_input("Tu pregunta", key="qa_input",
-                             placeholder="cuántas atendidas el 15 de junio en Turnos PM Estudios")
+                             placeholder="cu\u00e1ntas atendidas el 15 de junio en Turnos PM Estudios")
 
     if pregunta:
         _campaign_map = {c: [x["skill"] for x in v] for c, v in classification.items()}
@@ -584,7 +604,7 @@ with st.expander("🔎 Consultar los datos", expanded=False):
                 st.caption(res.suggestion)
 
     st.caption("Las respuestas se calculan directamente sobre los CSVs cargados: "
-               "son exactas y no se envía ningún dato fuera de la aplicación.")
+               "son exactas y no se env\u00eda ning\u00fan dato fuera de la aplicaci\u00f3n.")
 
 # ---- Resumen ejecutivo y conclusiones ----
 from app.ai_engine.summary_builder import (
@@ -592,16 +612,16 @@ from app.ai_engine.summary_builder import (
 )
 
 ai_texts = {}
-with st.expander("📝 Resumen ejecutivo y conclusiones", expanded=True):
+with st.expander("\U0001f4dd Resumen ejecutivo y conclusiones", expanded=True):
     modo = st.radio(
-        "¿Cómo querés generar los textos?",
-        ["Automático (gratis, sin IA)", "Con IA (requiere API key)"],
+        "\u00bfC\u00f3mo quer\u00e9s generar los textos?",
+        ["Autom\u00e1tico (gratis, sin IA)", "Con IA (requiere API key)"],
         horizontal=True,
-        help="El modo automático arma los textos con los números reales del reporte. "
-             "No manda datos a ningún servidor externo y no tiene costo.",
+        help="El modo autom\u00e1tico arma los textos con los n\u00fameros reales del reporte. "
+             "No manda datos a ning\u00fan servidor externo y no tiene costo.",
     )
 
-    if modo.startswith("Automático"):
+    if modo.startswith("Autom\u00e1tico"):
         resumen_auto = build_executive_summary(
             current_period, global_kpis, global_variations, campaign_kpis, prev_period)
         conclusiones_auto = build_conclusions(
@@ -613,25 +633,25 @@ with st.expander("📝 Resumen ejecutivo y conclusiones", expanded=True):
         st.markdown("**Conclusiones**")
         ai_texts["conclusiones"] = st.text_area("conclusiones", conclusiones_auto, height=180,
                                                  label_visibility="collapsed")
-        st.caption("Podés editar los textos antes de generar el reporte.")
+        st.caption("Pod\u00e9s editar los textos antes de generar el reporte.")
 
-        with st.popover("💬 Prefiero pedírselo a Claude.ai"):
+        with st.popover("\U0001f4ac Prefiero ped\u00edrselo a Claude.ai"):
             from app.ai_engine.client import build_kpi_summary
-            st.markdown("Copiá este texto y pegalo en claude.ai (o el chat que uses). "
-                        "Después pegá la respuesta en los campos de arriba.")
+            st.markdown("Copi\u00e1 este texto y pegalo en claude.ai (o el chat que uses). "
+                        "Despu\u00e9s peg\u00e1 la respuesta en los campos de arriba.")
             st.code(build_prompt_for_manual_ai(
                 current_period, build_kpi_summary(global_kpis, global_variations)),
                 language=None)
 
     else:
         if not api_key_input:
-            st.warning("Cargá una API key de Anthropic en la barra lateral para usar este modo.")
+            st.warning("Carg\u00e1 una API key de Anthropic en la barra lateral para usar este modo.")
         else:
             from app.ai_engine.client import AIEngine, build_kpi_summary
             if st.button("Generar textos con IA", use_container_width=True):
                 engine = AIEngine(api_key=api_key_input)
                 if not engine.is_available:
-                    st.error("No se pudo conectar con la IA. Revisá la API key.")
+                    st.error("No se pudo conectar con la IA. Revis\u00e1 la API key.")
                 else:
                     prompts = plugin.get_prompts()
                     kpi_summary = build_kpi_summary(global_kpis, global_variations)
@@ -641,7 +661,7 @@ with st.expander("📝 Resumen ejecutivo y conclusiones", expanded=True):
                         f"NA {campaign_kpis[c]['nivel_atencion']['formatted']}"
                         for c in CAMPAIGN_ORDER if c in campaign_kpis
                     ]
-                    full_summary = kpi_summary + "\n\nPor campaña:\n" + "\n".join(camp_lines)
+                    full_summary = kpi_summary + "\n\nPor campa\u00f1a:\n" + "\n".join(camp_lines)
                     with st.spinner("Redactando..."):
                         st.session_state["ai_resumen"] = engine.generate_executive_summary(
                             prompts, full_summary, current_period)
@@ -658,18 +678,18 @@ with st.expander("📝 Resumen ejecutivo y conclusiones", expanded=True):
                                                          height=180, label_visibility="collapsed")
 
 # Preview
-with st.expander("👁️ Vista previa de gráficos", expanded=False):
+with st.expander("\U0001f441\ufe0f Vista previa de gr\u00e1ficos", expanded=False):
     if "daily_all" in chart_images:
-        st.image(chart_images["daily_all"], caption="Distribución diaria — Todas las campañas")
+        st.image(chart_images["daily_all"], caption="Distribuci\u00f3n diaria \u2014 Todas las campa\u00f1as")
     for camp_name in CAMPAIGN_ORDER:
-        key = f"daily_{camp_name.lower().replace(' ', '_').replace('é', 'e')}"
+        key = f"daily_{camp_name.lower().replace(' ', '_').replace('\u00e9', 'e')}"
         if key in chart_images:
-            st.image(chart_images[key], caption=f"Distribución diaria — {camp_name}")
+            st.image(chart_images[key], caption=f"Distribuci\u00f3n diaria \u2014 {camp_name}")
 
 # ======================================================================
 # Generate PPTX
 # ======================================================================
-generate_btn = st.button("🚀 Generar reporte PPTX", type="primary", use_container_width=True)
+generate_btn = st.button("\U0001f680 Generar reporte PPTX", type="primary", use_container_width=True)
 
 if generate_btn:
     with st.spinner("Generando reporte..."):
@@ -678,14 +698,14 @@ if generate_btn:
 
         pptx_campaigns = []
         pptx_campaigns.append({
-            "name": "Todas las Campañas", "is_all": True,
+            "name": "Todas las Campa\u00f1as", "is_all": True,
             "kpis": fmt(global_kpis),
             "variations": fmt_var(global_variations),
             "chart_path": chart_images.get("daily_all", ""),
         })
         if global_ng_kpis:
             pptx_campaigns.append({
-                "name": "Todas las Campañas (sin Gipfel)", "is_all": True,
+                "name": "Todas las Campa\u00f1as (sin Gipfel)", "is_all": True,
                 "kpis": fmt(global_ng_kpis),
                 "variations": fmt_var(global_ng_variations),
                 "chart_path": chart_images.get("daily_all_no_gipfel", ""),
@@ -693,7 +713,7 @@ if generate_btn:
         for camp_name in CAMPAIGN_ORDER:
             if camp_name not in campaign_kpis:
                 continue
-            key = f"daily_{camp_name.lower().replace(' ', '_').replace('é', 'e')}"
+            key = f"daily_{camp_name.lower().replace(' ', '_').replace('\u00e9', 'e')}"
             pptx_campaigns.append({
                 "name": camp_name,
                 "kpis": fmt(campaign_kpis[camp_name]),
@@ -731,12 +751,12 @@ if generate_btn:
             parts = []
             for c in excluded:
                 share = campaign_kpis[c]["recibidas"]["value"] / total_all * 100 if total_all else 0
-                label = "Agendas Médicas" if c == "Agendas" else c
+                label = "Agendas M\u00e9dicas" if c == "Agendas" else c
                 parts.append(f"{label} ({share:.2f}%".replace(".", ",") + ")")
             donut_note = ("Nota: " + " y ".join(parts) +
-                          " no figuran en el gráfico de participación debido a su baja representación.")
+                          " no figuran en el gr\u00e1fico de participaci\u00f3n debido a su baja representaci\u00f3n.")
 
-        # Skill → campaign reference table
+        # Skill \u2192 campaign reference table
         skills_ref = [{"skill": s, "campaign": find_campaign(s)}
                       for s in sorted(current_dfs.keys())]
 
@@ -770,12 +790,12 @@ if generate_btn:
             skills_reference=skills_ref,
         )
 
-    st.success(f"✅ Reporte generado exitosamente ({len(pptx_campaigns)} campañas, {len(annexes)} anexos)")
+    st.success(f"\u2705 Reporte generado exitosamente ({len(pptx_campaigns)} campa\u00f1as, {len(annexes)} anexos)")
     slug = current_period.replace(" ", "_")
     col_pptx, col_pdf = st.columns(2)
     with col_pptx:
         st.download_button(
-            label="📥 Descargar PPTX",
+            label="\U0001f4e5 Descargar PPTX",
             data=pptx_bytes,
             file_name=f"Reporte_CCenter_{slug}.pptx",
             mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
@@ -783,7 +803,7 @@ if generate_btn:
         )
     with col_pdf:
         st.download_button(
-            label="📄 Descargar PDF",
+            label="\U0001f4c4 Descargar PDF",
             data=pdf_bytes,
             file_name=f"Reporte_CCenter_{slug}.pdf",
             mime="application/pdf",

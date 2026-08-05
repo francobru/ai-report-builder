@@ -18,7 +18,7 @@ import pandas as pd
 from app.core.plugin_registry import DataSchema
 
 
-# Columns that contain time values (HH:MM:SS) — never parse as numeric
+# Columns that contain time values (HH:MM:SS) \u2014 never parse as numeric
 _TIME_COLUMNS = {"AVGCONNWAIT", "AVGABNWAIT", "AVGTALKTIME"}
 
 
@@ -133,7 +133,7 @@ def _coerce_numerics(df: pd.DataFrame) -> pd.DataFrame:
         if col in _TIME_COLUMNS or col.startswith("date") or col in ("NUMDAY", "LOGDATE"):
             continue
         if df[col].dtype == object:
-            # Try converting comma-decimal strings like "81,70" → 81.70
+            # Try converting comma-decimal strings like "81,70" \u2192 81.70
             try:
                 converted = df[col].astype(str).str.replace(",", ".").astype(float)
                 df[col] = converted

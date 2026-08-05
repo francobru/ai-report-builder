@@ -1,4 +1,4 @@
-"""Embedded Hospital Alemán + JCI logo (base64).
+"""Embedded Hospital Alem\u00e1n + JCI logo (base64).
 
 This keeps the logo inside the code so it can never be lost during
 GitHub uploads or deployment. Decoded at runtime by the PPTX generator.

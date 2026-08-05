@@ -38,12 +38,12 @@ class ValidationResult:
     def summary(self) -> str:
         parts = [f"{self.row_count} filas"]
         if self.date_range:
-            parts.append(f"período {self.date_range}")
+            parts.append(f"per\u00edodo {self.date_range}")
         if self.errors:
             parts.append(f"{len(self.errors)} errores")
         if self.warnings:
             parts.append(f"{len(self.warnings)} advertencias")
-        return " · ".join(parts)
+        return " \u00b7 ".join(parts)
 
 
 def validate(
@@ -82,7 +82,7 @@ def validate(
         if col_spec.required and col_spec.name in df_cols:
             if df[col_spec.name].isna().all():
                 result.add_error(
-                    f"{prefix}Columna '{col_spec.name}' está completamente vacía."
+                    f"{prefix}Columna '{col_spec.name}' est\u00e1 completamente vac\u00eda."
                 )
             elif df[col_spec.name].isna().any():
                 n_missing = int(df[col_spec.name].isna().sum())
@@ -102,13 +102,13 @@ def validate(
         if not valid_dates.empty:
             d_min = valid_dates.min().strftime("%d/%m/%Y")
             d_max = valid_dates.max().strftime("%d/%m/%Y")
-            result.date_range = f"{d_min} – {d_max}"
+            result.date_range = f"{d_min} \u2013 {d_max}"
 
     # -- Sanity checks on numeric columns ---------------------------------
     numeric_checks = {
         "TOTALCALLS": ("Recibidas", 0, None),
         "TRANSFER": ("Atendidas", 0, None),
-        "PCTATT": ("Nivel de Atención", 0, 100),
+        "PCTATT": ("Nivel de Atenci\u00f3n", 0, 100),
     }
     for col, (label, vmin, vmax) in numeric_checks.items():
         if col not in df_cols:

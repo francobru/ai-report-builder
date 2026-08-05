@@ -1,10 +1,10 @@
-"""Fixed chart styles for the Hospital Alemán Contact Center report.
+"""Fixed chart styles for the Hospital Alem\u00e1n Contact Center report.
 
 These values are IMMUTABLE across months.  Every chart must use them
 so the visual output is identical between reports.
 
 Colors, fonts, sizes, and layout constants are all defined here.
-Individual chart renderers import from this module — never hardcode
+Individual chart renderers import from this module \u2014 never hardcode
 style values elsewhere.
 """
 
@@ -16,12 +16,12 @@ from matplotlib import font_manager
 
 
 # ======================================================================
-# Color palette — extracted from the PDF report
+# Color palette \u2014 extracted from the PDF report
 # ======================================================================
 
 DARK_NAVY = "#1B3A5C"         # Recibidas bars, header backgrounds
 MEDIUM_BLUE = "#5B9BD5"       # Atendidas bars
-GREEN_LINE = "#4CAF50"        # Nivel de Atención line
+GREEN_LINE = "#4CAF50"        # Nivel de Atenci\u00f3n line
 RED_ACCENT = "#E74C3C"        # Negative variation arrows
 GREEN_ACCENT = "#27AE60"      # Positive variation arrows
 LIGHT_GRAY_BG = "#F5F6F8"    # Card backgrounds
@@ -33,7 +33,7 @@ TEXT_GRAY = "#7F8C8D"         # Secondary text
 DONUT_COLORS = [
     DARK_NAVY,      # Turnos (largest)
     "#3A6EA5",      # Conmutador
-    MEDIUM_BLUE,    # Plan Médico
+    MEDIUM_BLUE,    # Plan M\u00e9dico
     "#8DB4E2",      # Portal
     "#B8D4F0",      # Agendas / small
     "#D6E8F7",      # Camp HA / tiny
@@ -50,7 +50,7 @@ OUTBOUND_BAR = DARK_NAVY
 FONT_FAMILY = "Calibri"
 FONT_FALLBACK = "DejaVu Sans"   # Available on all systems
 
-# Sizes (in points) — large enough to be readable in PPTX
+# Sizes (in points) \u2014 large enough to be readable in PPTX
 TITLE_SIZE = 18
 SUBTITLE_SIZE = 14
 LABEL_SIZE = 13
@@ -60,7 +60,7 @@ LEGEND_SIZE = 12
 
 
 # ======================================================================
-# Figure dimensions — sized for high-quality PPTX embedding
+# Figure dimensions \u2014 sized for high-quality PPTX embedding
 # ======================================================================
 
 # Standard chart area (wide format, fills PPTX slide)

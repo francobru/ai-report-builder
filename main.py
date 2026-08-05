@@ -1,4 +1,4 @@
-"""AI Report Builder — Main entry point.
+"""AI Report Builder \u2014 Main entry point.
 
 Supports two modes:
   1. CLI mode (for testing):  python main.py --files *.csv --output report.pptx
@@ -44,7 +44,7 @@ def _detect_period(ctx: PipelineContext) -> str:
                 month = dates.iloc[0].month
                 year = dates.iloc[0].year
                 return f"{month_names.get(month, '?')} {year}"
-    return "Período desconocido"
+    return "Per\u00edodo desconocido"
 
 
 # ======================================================================
@@ -70,7 +70,7 @@ def stage_validate(ctx: PipelineContext) -> PipelineContext:
         print(f"  {name}: {result.summary}")
 
     if ctx.validation_errors:
-        print(f"  ⚠ {len(ctx.validation_errors)} error(s) found")
+        print(f"  \u26a0 {len(ctx.validation_errors)} error(s) found")
     return ctx
 
 
@@ -150,7 +150,7 @@ def stage_generate_charts(ctx: PipelineContext) -> PipelineContext:
     for name, df in ctx.raw_dataframes.items():
         if "date" not in df.columns:
             continue
-        fig = chart_daily_distribution(df, title=f"Distribución diaria — {name}")
+        fig = chart_daily_distribution(df, title=f"Distribuci\u00f3n diaria \u2014 {name}")
         path = save_chart(fig, chart_dir / f"daily_{name}.png")
         ctx.chart_images[f"daily_{name}"] = path
 
@@ -165,13 +165,13 @@ def stage_generate_charts(ctx: PipelineContext) -> PipelineContext:
         ).reindex(range(7), fill_value=0)
         wk["na"] = (wk["att"] / wk["rec"].replace(0, 1) * 100).round(2)
 
-        day_labels = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"]
+        day_labels = ["lun", "mar", "mi\u00e9", "jue", "vie", "s\u00e1b", "dom"]
         fig = chart_grouped_bar_line(
             labels=day_labels,
             recibidas=wk["rec"].tolist(),
             atendidas=wk["att"].tolist(),
             nivel_atencion=wk["na"].tolist(),
-            title="Distribución por día de semana",
+            title="Distribuci\u00f3n por d\u00eda de semana",
         )
         path = save_chart(fig, chart_dir / "weekday_distribution.png")
         ctx.chart_images["weekday_distribution"] = path
@@ -225,7 +225,7 @@ def run_cli(args: argparse.Namespace) -> None:
     pipeline.add_stage("Validando datos", stage_validate)
     pipeline.add_stage("Combinando datos", stage_combine_data)
     pipeline.add_stage("Calculando KPIs", stage_compute_kpis)
-    pipeline.add_stage("Generando gráficos", stage_generate_charts)
+    pipeline.add_stage("Generando gr\u00e1ficos", stage_generate_charts)
 
     if args.format == "pptx":
         pipeline.add_stage("Generando reporte PPTX", stage_generate_report)
@@ -236,9 +236,9 @@ def run_cli(args: argparse.Namespace) -> None:
     ctx = pipeline.run(ctx, on_progress=on_progress)
 
     if ctx.validation_errors:
-        print(f"\n⚠ Warnings: {len(ctx.validation_errors)} validation errors")
+        print(f"\n\u26a0 Warnings: {len(ctx.validation_errors)} validation errors")
 
-    print(f"\n✓ Pipeline complete!")
+    print(f"\n\u2713 Pipeline complete!")
     if ctx.output_path:
         print(f"  Output: {ctx.output_path}")
 

@@ -61,7 +61,7 @@ def compute_variation(
             "recibidas": {
                 "variation_pct": -7.37,
                 "direction": "down",
-                "formatted": "▼ 7,37%",
+                "formatted": "\u25bc 7,37%",
             },
             ...
         }
@@ -85,16 +85,16 @@ def compute_variation(
             variations[kpi_id] = {
                 "variation_pct": None,
                 "direction": "neutral",
-                "formatted": "—",
+                "formatted": "\u2014",
             }
             continue
 
-        # Nivel de Atención uses percentage-POINT difference (e.g. 90,0 - 88,3 = 1,7 p.p.)
+        # Nivel de Atenci\u00f3n uses percentage-POINT difference (e.g. 90,0 - 88,3 = 1,7 p.p.)
         # Volume KPIs (recibidas, atendidas, promedios) use relative percentage change.
         if kpi_id == "nivel_atencion":
             diff = cur_val - prev_val
             direction = "up" if diff > 0 else "down" if diff < 0 else "neutral"
-            arrow = "▲" if direction == "up" else "▼" if direction == "down" else "—"
+            arrow = "\u25b2" if direction == "up" else "\u25bc" if direction == "down" else "\u2014"
             formatted = f"{arrow} {abs(diff):.2f}".replace(".", ",") + " p.p."
             variations[kpi_id] = {
                 "variation_pct": round(diff, 2),
@@ -105,7 +105,7 @@ def compute_variation(
 
         pct = ((cur_val - prev_val) / abs(prev_val)) * 100
         direction = "up" if pct > 0 else "down" if pct < 0 else "neutral"
-        arrow = "▲" if direction == "up" else "▼" if direction == "down" else "—"
+        arrow = "\u25b2" if direction == "up" else "\u25bc" if direction == "down" else "\u2014"
         formatted = f"{arrow} {abs(pct):.2f}%".replace(".", ",")
 
         variations[kpi_id] = {
@@ -146,8 +146,8 @@ def _compute_daily_average(df: pd.DataFrame, column: str) -> float:
     (TOTALCALLS > 0).  This gives the correct average even when multiple skills
     with different operating days are combined.
 
-    Example: Conmutador operates 31 days in July → total / 31.
-              Plan Médico operates 20 weekdays → total / 20.
+    Example: Conmutador operates 31 days in July \u2192 total / 31.
+              Plan M\u00e9dico operates 20 weekdays \u2192 total / 20.
     """
     if "date" not in df.columns or "TOTALCALLS" not in df.columns:
         # Fallback to simple mean if no date column
@@ -226,7 +226,7 @@ def _seconds_to_time_str(seconds: float) -> str:
 def _format_value(value: object, kpi: KPIDefinition) -> str:
     """Format a KPI value for display."""
     if value is None:
-        return "—"
+        return "\u2014"
 
     if isinstance(value, str):
         return value

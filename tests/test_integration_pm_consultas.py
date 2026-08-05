@@ -1,4 +1,4 @@
-"""Integration test: load PM_Consultas CSV → validate → compute KPIs.
+"""Integration test: load PM_Consultas CSV \u2192 validate \u2192 compute KPIs.
 
 Compares computed values against the known values from the May 2026 report.
 """
@@ -26,8 +26,8 @@ def test_csv_loads_successfully():
     assert len(df) > 0, "CSV should have rows after removing total"
     assert "TOTALCALLS" in df.columns
     assert "TRANSFER" in df.columns
-    print(f"  ✓ Loaded {len(df)} rows")
-    print(f"  ✓ Columns: {list(df.columns)}")
+    print(f"  \u2713 Loaded {len(df)} rows")
+    print(f"  \u2713 Columns: {list(df.columns)}")
 
 
 def test_total_row_removed():
@@ -35,7 +35,7 @@ def test_total_row_removed():
     first_col = df.columns[0]
     has_total = df[first_col].astype(str).str.lower().str.startswith("total").any()
     assert not has_total, "Total row should be removed"
-    print("  ✓ Total row removed correctly")
+    print("  \u2713 Total row removed correctly")
 
 
 def test_dates_parsed():
@@ -43,17 +43,17 @@ def test_dates_parsed():
     assert "date" in df.columns
     valid_dates = df["date"].dropna()
     assert len(valid_dates) == len(df), f"All dates should parse, got {len(valid_dates)}/{len(df)}"
-    print(f"  ✓ Date range: {valid_dates.min().date()} → {valid_dates.max().date()}")
+    print(f"  \u2713 Date range: {valid_dates.min().date()} \u2192 {valid_dates.max().date()}")
 
 
 def test_validation_passes():
     df = load_csv(CSV_PATH, schema=schema)
     result = validate(df, schema, source_name="PM_Consultas_may26")
     assert result.is_valid, f"Validation failed: {result.errors}"
-    print(f"  ✓ Validation passed: {result.summary}")
+    print(f"  \u2713 Validation passed: {result.summary}")
     if result.warnings:
         for w in result.warnings:
-            print(f"    ⚠ {w}")
+            print(f"    \u26a0 {w}")
 
 
 def test_kpis_match_report():
@@ -71,9 +71,9 @@ def test_kpis_match_report():
     print("\n  KPI Results vs Expected:")
     for kpi_id, expected_val in expected.items():
         actual = kpis[kpi_id]["value"]
-        match = "✓" if abs(actual - expected_val) < 1 else "✗"
+        match = "\u2713" if abs(actual - expected_val) < 1 else "\u2717"
         print(f"    {match} {kpis[kpi_id]['label']}: {kpis[kpi_id]['formatted']} "
-              f"(expected ≈{expected_val})")
+              f"(expected \u2248{expected_val})")
         assert abs(actual - expected_val) < 1, (
             f"{kpi_id}: expected ~{expected_val}, got {actual}"
         )
@@ -101,12 +101,12 @@ if __name__ == "__main__":
     passed = 0
     failed = 0
     for test_func in tests:
-        print(f"\n▸ {test_func.__name__}")
+        print(f"\n\u25b8 {test_func.__name__}")
         try:
             test_func()
             passed += 1
         except Exception as e:
-            print(f"  ✗ FAILED: {e}")
+            print(f"  \u2717 FAILED: {e}")
             failed += 1
 
     print(f"\n{'=' * 60}")

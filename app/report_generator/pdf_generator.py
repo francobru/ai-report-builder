@@ -1,4 +1,4 @@
-"""PDF report generator — replicates the May 2026 report design.
+"""PDF report generator \u2014 replicates the May 2026 report design.
 
 Uses ReportLab to draw the same landscape layout as the PPTX version:
 navy header bars with a green accent, KPI cards, embedded charts, and
@@ -20,7 +20,7 @@ from reportlab.pdfgen import canvas as rl_canvas
 
 
 # ======================================================================
-# Page geometry — 13.333" x 7.5" (16:9), same as the PPTX slides
+# Page geometry \u2014 13.333" x 7.5" (16:9), same as the PPTX slides
 # ======================================================================
 PAGE_W = 13.333 * 72   # 960 pt
 PAGE_H = 7.5 * 72      # 540 pt
@@ -28,7 +28,7 @@ PAGE_SIZE = (PAGE_W, PAGE_H)
 
 
 def _in(inches: float) -> float:
-    """Inches → points."""
+    """Inches \u2192 points."""
     return inches * 72
 
 
@@ -38,7 +38,7 @@ def _y(top_inches: float) -> float:
 
 
 # ======================================================================
-# Colors — identical to the PPTX/chart palette
+# Colors \u2014 identical to the PPTX/chart palette
 # ======================================================================
 DARK_NAVY = HexColor("#1B3A5C")
 MEDIUM_BLUE = HexColor("#5B9BD5")
@@ -185,14 +185,14 @@ def _header_bar(c, title, period):
     _rect(c, 0, 0, 13.333, 0.65, fill=DARK_NAVY)
     _rect(c, 0, 0.65, 13.333, 0.04, fill=GREEN)
     _text(c, 0.5, 0.22, title, size=18, bold=True, color=WHITE)
-    _text(c, 8.0, 0.25, f"Productividad del Contact Center · {period}",
+    _text(c, 8.0, 0.25, f"Productividad del Contact Center \u00b7 {period}",
           size=10, color=SUBTITLE_GRAY, align="right", width_in=4.8)
 
 
 def _footer(c, page_num, total_pages):
     _rect(c, 0.5, 6.9, 12.3, 0.01, fill=BORDER_GRAY)
-    _text(c, 0.5, 7.05, "Hospital Alemán · Fuente: Tecnovoz", size=8, color=TEXT_GRAY)
-    _text(c, 9.0, 7.05, f"Página {page_num} de {total_pages}",
+    _text(c, 0.5, 7.05, "Hospital Alem\u00e1n \u00b7 Fuente: Tecnovoz", size=8, color=TEXT_GRAY)
+    _text(c, 9.0, 7.05, f"P\u00e1gina {page_num} de {total_pages}",
           size=8, color=TEXT_GRAY, align="right", width_in=3.8)
 
 
@@ -202,7 +202,7 @@ def _section_title(c, text, y_top):
 
 
 def _kpi_card(c, x, y, w, label, value, variation=None, accent=None,
-              h=1.0, value_size=24, label_size=8):
+              h=0.82, value_size=20, label_size=7):
     """Standard KPI card.
 
     The variation band is ALWAYS reserved, even when there is no variation,
@@ -243,7 +243,7 @@ def _big_kpi_card(c, x, y, w, h, label, value, variation=None, accent=None):
 
 
 def _time_card(c, x, y, w, label, value):
-    h = 0.85
+    h = 0.66
     _rect(c, x, y, w, h, fill=WHITE, stroke=BORDER_GRAY)
     _text_in_box(c, x, y + 0.08, w, 0.24, str(label).upper(),
                  size=8, color=TEXT_GRAY, align="left")
@@ -305,17 +305,17 @@ def _page_cover(c, period):
     if logo_bytes:
         _image(c, logo_bytes, (13.333 - 7.0) / 2, 1.3, 7.0, 7.0 / 4.95)
     else:
-        _text(c, 0, 2.4, "Hospital Alemán", size=44, bold=True,
+        _text(c, 0, 2.4, "Hospital Alem\u00e1n", size=44, bold=True,
               color=DARK_NAVY, align="center", width_in=13.333)
 
     _rect(c, 0.8, 3.6, 0.06, 0.5, fill=GREEN)
     _text(c, 1.0, 3.75, "Productividad del Contact Center", size=28, bold=True, color=DARK_NAVY)
-    _text(c, 1.0, 4.35, "Análisis de Campañas", size=16, color=TEXT_DARK)
-    _text(c, 1.0, 4.75, "Volumen de llamadas, nivel de atención y tiempos operativos",
+    _text(c, 1.0, 4.35, "An\u00e1lisis de Campa\u00f1as", size=16, color=TEXT_DARK)
+    _text(c, 1.0, 4.75, "Volumen de llamadas, nivel de atenci\u00f3n y tiempos operativos",
           size=11, color=TEXT_GRAY)
 
     _rect(c, 1.0, 5.3, 3.5, 0.7, fill=LIGHT_GRAY, stroke=BORDER_GRAY)
-    _text_in_box(c, 1.0, 5.36, 3.5, 0.24, "PERÍODO ANALIZADO",
+    _text_in_box(c, 1.0, 5.36, 3.5, 0.24, "PER\u00cdODO ANALIZADO",
                  size=8, color=TEXT_GRAY, align="left", pad_in=0.15)
     _text_in_box(c, 1.0, 5.60, 3.5, 0.34, period,
                  size=14, bold=True, color=DARK_NAVY, align="left", pad_in=0.15)
@@ -336,50 +336,50 @@ def _page_general_data(c, period, kpis, variations, page_num, total_pages):
     _text(c, 0.7, 1.45, "Variaciones calculadas respecto al mes anterior.",
           size=10, italic=True, color=TEXT_GRAY)
 
-    # Row 1 — two large cards
+    # Row 1 \u2014 two large cards
     card_w, gap, h1 = 5.5, 0.4, 2.4
     x0 = (13.333 - (card_w * 2 + gap)) / 2
     _big_kpi_card(c, x0, 1.85, card_w, h1, "Recibidas",
-                  kpis.get("recibidas", "—"), variations.get("recibidas"), DARK_NAVY)
+                  kpis.get("recibidas", "\u2014"), variations.get("recibidas"), DARK_NAVY)
     _big_kpi_card(c, x0 + card_w + gap, 1.85, card_w, h1, "Atendidas",
-                  kpis.get("atendidas", "—"), variations.get("atendidas"), MEDIUM_BLUE)
+                  kpis.get("atendidas", "\u2014"), variations.get("atendidas"), MEDIUM_BLUE)
 
-    # Row 2 — three cards
+    # Row 2 \u2014 three cards
     cw2, gap2, h2 = 3.9, 0.3, 2.2
     x1 = (13.333 - (cw2 * 3 + gap2 * 2)) / 2
     _big_kpi_card(c, x1, 4.45, cw2, h2, "Prom. Diario Recibidas",
-                  kpis.get("promedio_recibidas", "—"), None, TEXT_GRAY)
+                  kpis.get("promedio_recibidas", "\u2014"), None, TEXT_GRAY)
     _big_kpi_card(c, x1 + cw2 + gap2, 4.45, cw2, h2, "Prom. Diario Atendidas",
-                  kpis.get("promedio_atendidas", "—"), None, TEXT_GRAY)
-    _big_kpi_card(c, x1 + (cw2 + gap2) * 2, 4.45, cw2, h2, "Nivel de Atención",
-                  kpis.get("nivel_atencion", "—"), variations.get("nivel_atencion"), GREEN)
+                  kpis.get("promedio_atendidas", "\u2014"), None, TEXT_GRAY)
+    _big_kpi_card(c, x1 + (cw2 + gap2) * 2, 4.45, cw2, h2, "Nivel de Atenci\u00f3n",
+                  kpis.get("nivel_atencion", "\u2014"), variations.get("nivel_atencion"), GREEN)
 
 
 def _page_campaign(c, name, kpis, variations, chart_path, period, page_num, total_pages,
                    is_all=False):
-    title = name if is_all else f"Campaña: {name}"
+    title = name if is_all else f"Campa\u00f1a: {name}"
     _header_bar(c, title, period)
     _footer(c, page_num, total_pages)
-    _section_title(c, "Indicadores y distribución diaria", 0.9)
+    _section_title(c, "Indicadores y distribuci\u00f3n diaria", 0.85)
 
     cw, gap = 2.3, 0.15
     cards = [
-        ("Recibidas", kpis.get("recibidas", "—"), variations.get("recibidas"), DARK_NAVY),
-        ("Atendidas", kpis.get("atendidas", "—"), variations.get("atendidas"), MEDIUM_BLUE),
-        ("Prom. Recibidas", kpis.get("promedio_recibidas", "—"), None, None),
-        ("Prom. Atendidas", kpis.get("promedio_atendidas", "—"), None, None),
-        ("Nivel de Atención", kpis.get("nivel_atencion", "—"),
+        ("Recibidas", kpis.get("recibidas", "-"), variations.get("recibidas"), DARK_NAVY),
+        ("Atendidas", kpis.get("atendidas", "-"), variations.get("atendidas"), MEDIUM_BLUE),
+        ("Prom. Recibidas", kpis.get("promedio_recibidas", "-"), None, None),
+        ("Prom. Atendidas", kpis.get("promedio_atendidas", "-"), None, None),
+        ("Nivel de Atenci\u00f3n", kpis.get("nivel_atencion", "-"),
          variations.get("nivel_atencion"), GREEN),
     ]
     for i, (lbl, val, var, acc) in enumerate(cards):
-        _kpi_card(c, 0.5 + i * (cw + gap), 1.4, cw, lbl, val, var, acc)
+        _kpi_card(c, 0.5 + i * (cw + gap), 1.28, cw, lbl, val, var, acc)
 
     tw = 3.8
-    _time_card(c, 0.5, 2.6, tw, "Conversación", kpis.get("tiempo_conversacion", "—"))
-    _time_card(c, 0.5 + tw + gap, 2.6, tw, "Demora", kpis.get("tiempo_demora", "—"))
-    _time_card(c, 0.5 + (tw + gap) * 2, 2.6, tw, "Abandono", kpis.get("tiempo_abandono", "—"))
+    _time_card(c, 0.5, 2.22, tw, "Conversaci\u00f3n", kpis.get("tiempo_conversacion", "-"))
+    _time_card(c, 0.5 + tw + gap, 2.22, tw, "Demora", kpis.get("tiempo_demora", "-"))
+    _time_card(c, 0.5 + (tw + gap) * 2, 2.22, tw, "Abandono", kpis.get("tiempo_abandono", "-"))
 
-    _image(c, chart_path, 0.3, 3.7, 12.5, 3.0)
+    _image(c, chart_path, 0.35, 3.05, 12.6, 3.75)
 
 
 def _page_chart(c, title, section, chart_path, period, page_num, total_pages,
@@ -406,12 +406,12 @@ def _page_dual_chart(c, title, section, left, right, period, page_num, total_pag
 
 
 def _page_skill_table(c, skill_table, period, page_num, total_pages):
-    _header_bar(c, "Análisis de Habilidades", period)
+    _header_bar(c, "An\u00e1lisis de Habilidades", period)
     _footer(c, page_num, total_pages)
-    _section_title(c, "Detalle por habilidad — volumen, atención y tiempos promedio", 0.9)
+    _section_title(c, "Detalle por habilidad \u2014 volumen, atenci\u00f3n y tiempos promedio", 0.9)
 
     headers = ["Habilidad", "Recibidas", "Atendidas", "NA",
-               "Conversación", "Demora", "Abandono"]
+               "Conversaci\u00f3n", "Demora", "Abandono"]
     widths = [2.5, 1.4, 1.4, 1.2, 1.5, 1.5, 1.5]
     rows = [[s["name"], s["recibidas"], s["atendidas"], s["na"],
              s["conversacion"], s["demora"], s["abandono"]] for s in skill_table]
@@ -419,12 +419,12 @@ def _page_skill_table(c, skill_table, period, page_num, total_pages):
 
 
 def _page_monthly_trend(c, trend, chart_path, period, page_num, total_pages):
-    _header_bar(c, "Evolución Mensual", period)
+    _header_bar(c, "Evoluci\u00f3n Mensual", period)
     _footer(c, page_num, total_pages)
-    _section_title(c, "Tendencia mensual del año", 0.9)
+    _section_title(c, "Tendencia mensual del a\u00f1o", 0.9)
 
     if not trend:
-        _text(c, 0.7, 1.8, "Sin datos históricos disponibles",
+        _text(c, 0.7, 1.8, "Sin datos hist\u00f3ricos disponibles",
               size=12, italic=True, color=TEXT_GRAY)
         return
 
@@ -439,7 +439,7 @@ def _page_monthly_trend(c, trend, chart_path, period, page_num, total_pages):
     rows = [
         ["Recibidas"] + [f"{r['recibidas']:,}".replace(",", ".") for r in trend],
         ["Atendidas"] + [f"{r['atendidas']:,}".replace(",", ".") for r in trend],
-        ["Nivel de Atención"] + [f"{r['nivel_atencion']:.1f}%".replace(".", ",") for r in trend],
+        ["Nivel de Atenci\u00f3n"] + [f"{r['nivel_atencion']:.1f}%".replace(".", ",") for r in trend],
     ]
     _table(c, x, 1.35, widths, headers, rows, row_h=0.3, row_size=9, header_size=9)
     _image(c, chart_path, 0.5, 3.0, 12.3, 3.7)
@@ -448,7 +448,7 @@ def _page_monthly_trend(c, trend, chart_path, period, page_num, total_pages):
 def _page_outbound(c, outbound, chart_images, period, page_num, total_pages):
     _header_bar(c, "Llamadas Salientes", period)
     _footer(c, page_num, total_pages)
-    _section_title(c, "Resumen de gestión de llamadas salientes", 0.9)
+    _section_title(c, "Resumen de gesti\u00f3n de llamadas salientes", 0.9)
 
     total = outbound.get("total", 0)
     total_str = f"{int(total):,}".replace(",", ".")
@@ -456,7 +456,7 @@ def _page_outbound(c, outbound, chart_images, period, page_num, total_pages):
     _kpi_card(c, 0.5, 1.4, 3.8, "Total Llamadas Salientes", total_str, None, DARK_NAVY)
     _kpi_card(c, 4.6, 1.4, 3.8, "Rotaciones AM", "", None, MEDIUM_BLUE)
     _kpi_card(c, 8.7, 1.4, 3.8, "Solo Operadores AM", "", None, GREEN)
-    _text(c, 4.6, 2.62, "Completar manualmente — fuente: registro de cancelaciones de supervisores",
+    _text(c, 4.6, 2.62, "Completar manualmente \u2014 fuente: registro de cancelaciones de supervisores",
           size=8, italic=True, color=TEXT_GRAY, align="center", width_in=7.9)
 
     _image(c, chart_images.get("outbound_result"), 0.3, 2.8, 6.2, 3.9)
@@ -464,9 +464,9 @@ def _page_outbound(c, outbound, chart_images, period, page_num, total_pages):
 
 
 def _page_annex_daily(c, campaign_name, daily_rows, period, page_num, total_pages):
-    _header_bar(c, f"Anexo — {campaign_name}", period)
+    _header_bar(c, f"Anexo \u2014 {campaign_name}", period)
     _footer(c, page_num, total_pages)
-    _section_title(c, f"Productividad diaria — {campaign_name}", 0.9)
+    _section_title(c, f"Productividad diaria \u2014 {campaign_name}", 0.9)
 
     if not daily_rows:
         _text(c, 0.7, 1.8, "Sin datos disponibles", size=12, italic=True, color=TEXT_GRAY)
@@ -507,16 +507,16 @@ def _page_annex_daily(c, campaign_name, daily_rows, period, page_num, total_page
 
 
 def _page_skills_reference(c, skills_reference, period, page_num, total_pages):
-    _header_bar(c, "Anexo — Referencia de Habilidades", period)
+    _header_bar(c, "Anexo \u2014 Referencia de Habilidades", period)
     _footer(c, page_num, total_pages)
-    _section_title(c, "Habilidades por campaña", 0.9)
+    _section_title(c, "Habilidades por campa\u00f1a", 0.9)
 
     if not skills_reference:
         _text(c, 0.7, 1.8, "Sin datos disponibles", size=12, italic=True, color=TEXT_GRAY)
         return
 
     rows = [[s["skill"], s["campaign"]] for s in skills_reference]
-    headers = ["Habilidad", "Campaña"]
+    headers = ["Habilidad", "Campa\u00f1a"]
     n = len(rows)
     n_cols = 1 if n <= 14 else (2 if n <= 28 else 3)
     per_col = -(-n // n_cols)
@@ -558,8 +558,8 @@ def generate_pdf_report(
     annexes = annexes or []
     buffer = io.BytesIO()
     c = rl_canvas.Canvas(buffer, pagesize=PAGE_SIZE)
-    c.setTitle(f"Productividad del Contact Center · {period}")
-    c.setAuthor("Hospital Alemán")
+    c.setTitle(f"Productividad del Contact Center \u00b7 {period}")
+    c.setAuthor("Hospital Alem\u00e1n")
 
     # Count pages upfront so footers are accurate
     total = 4 + len(campaign_data) + 1 + len(annexes)
@@ -582,13 +582,13 @@ def generate_pdf_report(
     c.showPage()
     page += 1
 
-    _page_chart(c, "Distribución por Día de Semana",
-                "Comportamiento por día — todas las campañas",
+    _page_chart(c, "Distribuci\u00f3n por D\u00eda de Semana",
+                "Comportamiento por d\u00eda \u2014 todas las campa\u00f1as",
                 chart_images.get("weekday_distribution"), period, page, total)
     c.showPage()
     page += 1
 
-    _page_dual_chart(c, "Análisis de Campañas", "Volumen y participación por campaña",
+    _page_dual_chart(c, "An\u00e1lisis de Campa\u00f1as", "Volumen y participaci\u00f3n por campa\u00f1a",
                      chart_images.get("campaign_volume"),
                      chart_images.get("campaign_share"),
                      period, page, total, footnote=donut_footnote)
@@ -614,7 +614,7 @@ def generate_pdf_report(
         page += 1
 
     if chart_images.get("skill_volume_top10"):
-        _page_chart(c, "Análisis de Habilidades — Top 10",
+        _page_chart(c, "An\u00e1lisis de Habilidades \u2014 Top 10",
                     "Top 10 habilidades por volumen de llamadas",
                     chart_images["skill_volume_top10"], period, page, total)
         c.showPage()

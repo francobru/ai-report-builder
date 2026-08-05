@@ -1,4 +1,4 @@
-"""AI Engine — builds prompts from KPI data and calls the Claude API.
+"""AI Engine \u2014 builds prompts from KPI data and calls the Claude API.
 
 The AI is used ONLY for:
   - Executive summary
@@ -39,7 +39,7 @@ class AIEngine:
                 import anthropic
                 self._client = anthropic.Anthropic(api_key=self._api_key)
             except ImportError:
-                print("[AIEngine] anthropic package not installed — AI text disabled.")
+                print("[AIEngine] anthropic package not installed \u2014 AI text disabled.")
 
     @property
     def is_available(self) -> bool:
@@ -108,7 +108,7 @@ class AIEngine:
     def _call(self, prompt: str) -> str:
         """Send a prompt to Claude and return the response text."""
         if not self.is_available:
-            return "(Texto generado por IA no disponible — configure ANTHROPIC_API_KEY)"
+            return "(Texto generado por IA no disponible \u2014 configure ANTHROPIC_API_KEY)"
 
         try:
             response = self._client.messages.create(
@@ -127,9 +127,9 @@ def build_kpi_summary(kpis: dict[str, dict], variations: dict[str, dict] | None 
 
     Example output::
 
-        - Recibidas: 77.530 (▼ 7,37% vs mes anterior)
-        - Atendidas: 69.740 (▼ 5,60% vs mes anterior)
-        - Nivel de Atención: 89,95% (▲ 1,91% vs mes anterior)
+        - Recibidas: 77.530 (\u25bc 7,37% vs mes anterior)
+        - Atendidas: 69.740 (\u25bc 5,60% vs mes anterior)
+        - Nivel de Atenci\u00f3n: 89,95% (\u25b2 1,91% vs mes anterior)
     """
     lines: list[str] = []
     for kpi_id, data in kpis.items():
@@ -138,7 +138,7 @@ def build_kpi_summary(kpis: dict[str, dict], variations: dict[str, dict] | None 
             line += f" {data['unit']}"
         if variations and kpi_id in variations:
             var = variations[kpi_id]
-            if var["formatted"] != "—":
+            if var["formatted"] != "\u2014":
                 line += f" ({var['formatted']} vs mes anterior)"
         lines.append(line)
     return "\n".join(lines)

@@ -1,6 +1,6 @@
 """Historical monthly totals for the monthly-trend analysis.
 
-Stores per-month totals (recibidas, atendidas, nivel de atención) so the
+Stores per-month totals (recibidas, atendidas, nivel de atenci\u00f3n) so the
 report can show the year-to-date trend (page 12 of the original report).
 
 The data from the May 2026 report is pre-loaded here. As new reports are
@@ -98,7 +98,7 @@ def add_month(year: int, month: int, recibidas: int, atendidas: int,
 def get_trend(year: int, up_to_month: int) -> list[MonthlyRecord]:
     """Return the ordered list of monthly records for *year* up to *up_to_month*.
 
-    Example: get_trend(2026, 5) → [Enero, Febrero, Marzo, Abril, Mayo]
+    Example: get_trend(2026, 5) \u2192 [Enero, Febrero, Marzo, Abril, Mayo]
     """
     records = _load_history()
     result = [

@@ -80,7 +80,7 @@ def aggregate_outbound(df: pd.DataFrame) -> dict:
 
 
 def count_rotaciones_am(df: pd.DataFrame) -> int:
-    """Count 'Rotaciones AM' — calls that resulted in a rotation to medical agendas.
+    """Count 'Rotaciones AM' \u2014 calls that resulted in a rotation to medical agendas.
 
     NOTE: In the original May report this figure comes from a separate
     supervisor-completed cancellation registry, not from this CSV.
