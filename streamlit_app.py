@@ -99,7 +99,7 @@ st.markdown("""
 </div>""", unsafe_allow_html=True)
 
 # Version banner \u2014 lets you confirm at a glance which version is deployed
-APP_VERSION = "3.1"
+APP_VERSION = "3.2"
 st.caption(f"Versi\u00f3n {APP_VERSION} \u00b7 Dos tipos de reporte: Contact Center y Plan Medico")
 
 with st.sidebar:

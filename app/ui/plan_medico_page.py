@@ -31,6 +31,11 @@ CONSULTAS_SKILL = "PM Consultas"
 
 _SCHEMA = ContactCenterPlugin().get_schema()
 
+# How the average conversation time is computed.
+#   "simple"    -> plain mean of the daily figures (current choice)
+#   "ponderado" -> each day weighted by its answered calls
+CONVERSACION_MODO = "simple"
+
 
 def _fmt(n) -> str:
     return f"{int(n):,}".replace(",", ".")
@@ -51,19 +56,27 @@ def _aggregate(frames: list[pd.DataFrame]) -> tuple[pd.DataFrame, dict]:
     rec = int(daily["TOTALCALLS"].sum())
     att = int(daily["TRANSFER"].sum())
 
-    # Conversation time weighted by answered calls
+    # Average conversation time (see CONVERSACION_MODO)
     secs = weight = 0.0
     for fr in frames:
         for _, row in fr.iterrows():
             parts = str(row.get("AVGTALKTIME", "")).split(":")
-            n = float(row.get("TRANSFER") or 0)
-            if len(parts) == 3 and n > 0:
-                try:
-                    secs += (int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])) * n
-                    weight += n
-                except ValueError:
-                    pass
-    avg = int(secs / weight) if weight else 0
+            if len(parts) != 3:
+                continue
+            try:
+                value = int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+            except ValueError:
+                continue
+            if CONVERSACION_MODO == "ponderado":
+                n = float(row.get("TRANSFER") or 0)
+                if n <= 0:
+                    continue
+                secs += value * n
+                weight += n
+            else:  # simple: every day counts the same
+                secs += value
+                weight += 1
+    avg = int(round(secs / weight)) if weight else 0   # round, do not truncate
 
     kpis = {
         "recibidas": _fmt(rec),
