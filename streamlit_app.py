@@ -43,7 +43,8 @@ kpi_defs = plugin.get_kpis()
 # ======================================================================
 st.set_page_config(page_title="AI Report Builder", page_icon="\u2695\ufe0f", layout="wide")
 
-from app.ui.theme import inject_css, masthead, step as ha_step, card as ha_card, chip as ha_chip
+from app.ui.theme import (inject_css, masthead, step as ha_step,
+                          card as ha_card, chip as ha_chip, _render as ha_render)
 
 inject_css()
 
@@ -64,11 +65,11 @@ masthead("Productividad del Contact Center",
          "Genera el reporte mensual a partir de los CSV de Tecnovoz")
 
 # Version banner \u2014 lets you confirm at a glance which version is deployed
-APP_VERSION = "3.3"
+APP_VERSION = "3.3.2"
 st.caption(f"Versi\u00f3n {APP_VERSION} \u00b7 Dos tipos de reporte: Contact Center y Plan Medico")
 
 with st.sidebar:
-    st.markdown("### \U0001f4cb Instrucciones")
+    st.markdown("#### Como funciona")
     st.markdown(
         "1. Sub\u00ed los **CSVs del mes actual**\n"
         "2. *(Opcional)* Sub\u00ed tambi\u00e9n los del **mes anterior**\n"
@@ -77,7 +78,7 @@ with st.sidebar:
         "5. Descarg\u00e1 el PPTX"
     )
     st.divider()
-    st.markdown("### \U0001f916 Resumen con IA")
+    st.markdown("#### Resumen con IA")
     st.caption("Opcional. Genera resumen ejecutivo y conclusiones.")
     _default_key = ""
     try:
@@ -98,20 +99,20 @@ ha_step(1, "Subir los archivos CSV")
 
 col_cur, col_prev = st.columns(2)
 with col_cur:
-    st.markdown("**\U0001f4c1 Mes actual** (obligatorio)")
+    st.markdown("**Mes actual** \u00b7 obligatorio")
     current_files = st.file_uploader("CSVs del mes a reportar", type=["csv"],
                                       accept_multiple_files=True, key="current")
 with col_prev:
-    st.markdown("**\U0001f4c1 Mes anterior** (opcional, para variaciones)")
+    st.markdown("**Mes anterior** \u00b7 opcional, para comparar")
     previous_files = st.file_uploader("CSVs del mes anterior", type=["csv"],
                                        accept_multiple_files=True, key="previous")
 
-st.markdown("**\U0001f4de Llamadas salientes** (opcional, archivo aparte)")
+st.markdown("**Llamadas salientes** \u00b7 opcional, archivo aparte")
 outbound_file = st.file_uploader("CSV de llamadas salientes", type=["csv"],
                                   accept_multiple_files=False, key="outbound")
 
 if not current_files:
-    st.info("\U0001f446 Sub\u00ed los archivos CSV del mes que quer\u00e9s reportar.")
+    st.info("Sub\u00ed los archivos CSV del mes que quer\u00e9s reportar para empezar.")
     st.stop()
 
 # ======================================================================
@@ -185,8 +186,7 @@ for camp_name in CAMPAIGN_ORDER + ["Camp HA", "Sin asignar"]:
     if camp_name not in classification_all:
         continue
     skills = classification_all[camp_name]
-    st.markdown(ha_chip(camp_name, muted=(camp_name == "Sin asignar")),
-                unsafe_allow_html=True)
+    ha_render(ha_chip(camp_name, muted=(camp_name == "Sin asignar")))
 
     cols = st.columns(4)
     for i, sk in enumerate(skills):
@@ -314,29 +314,26 @@ st.markdown(f"#### Todas las campa\u00f1as seleccionadas \u2014 {current_period}
 # Row 1: 2 big cards
 cols_top = st.columns(2)
 with cols_top[0]:
-    st.markdown(render_kpi_card("Recibidas", global_kpis["recibidas"]["formatted"],
-                                 "#1B3A5C", global_variations.get("recibidas")),
-                unsafe_allow_html=True)
+    ha_render(render_kpi_card("Recibidas", global_kpis["recibidas"]["formatted"],
+                                 "#1B3A5C", global_variations.get("recibidas")))
 with cols_top[1]:
-    st.markdown(render_kpi_card("Atendidas", global_kpis["atendidas"]["formatted"],
-                                 "#5B9BD5", global_variations.get("atendidas")),
-                unsafe_allow_html=True)
+    ha_render(render_kpi_card("Atendidas", global_kpis["atendidas"]["formatted"],
+                                 "#5B9BD5", global_variations.get("atendidas")))
 
 # Row 2: 3 cards
 cols_bot = st.columns(3)
 with cols_bot[0]:
-    st.markdown(render_kpi_card("Prom. Diario Recibidas",
+    ha_render(render_kpi_card("Prom. Diario Recibidas",
                                  global_kpis["promedio_recibidas"]["formatted"],
-                                 "#7F8C8D"), unsafe_allow_html=True)
+                                 "#7F8C8D"))
 with cols_bot[1]:
-    st.markdown(render_kpi_card("Prom. Diario Atendidas",
+    ha_render(render_kpi_card("Prom. Diario Atendidas",
                                  global_kpis["promedio_atendidas"]["formatted"],
-                                 "#7F8C8D"), unsafe_allow_html=True)
+                                 "#7F8C8D"))
 with cols_bot[2]:
-    st.markdown(render_kpi_card("Nivel de Atenci\u00f3n",
+    ha_render(render_kpi_card("Nivel de Atenci\u00f3n",
                                  global_kpis["nivel_atencion"]["formatted"],
-                                 "#4CAF50", global_variations.get("nivel_atencion")),
-                unsafe_allow_html=True)
+                                 "#4CAF50", global_variations.get("nivel_atencion")))
 
 # Time cards
 st.markdown("")
@@ -345,11 +342,10 @@ for col, kid, lab in zip(time_cols,
     ["tiempo_conversacion", "tiempo_demora", "tiempo_abandono"],
     ["Conversaci\u00f3n", "Demora", "Abandono"]):
     with col:
-        st.markdown(render_kpi_card(lab, global_kpis[kid]["formatted"], "#1B3A5C"),
-                    unsafe_allow_html=True)
+        ha_render(render_kpi_card(lab, global_kpis[kid]["formatted"], "#1B3A5C"))
 
 # Campaign KPIs
-with st.expander("\U0001f4ca KPIs por campa\u00f1a" + (" (con variaciones)" if prev_dfs else ""), expanded=True):
+with st.expander("KPIs por campa\u00f1a" + (" (con variaciones)" if prev_dfs else ""), expanded=True):
     for camp_name in CAMPAIGN_ORDER + ["Camp HA"]:
         if camp_name not in campaign_kpis:
             continue
@@ -360,12 +356,12 @@ with st.expander("\U0001f4ca KPIs por campa\u00f1a" + (" (con variaciones)" if p
             val = ck[kid]["formatted"]
             vr = cv.get(kid, {}).get("formatted", "")
             arrow = ""
-            if vr and "\u25b2" in vr: arrow = "\U0001f7e2"
-            elif vr and "\u25bc" in vr: arrow = "\U0001f534"
+            if vr and "\u25b2" in vr: arrow = ""
+            elif vr and "\u25bc" in vr: arrow = ""
             parts.append(f"{lab}: **{val}**{' ' + arrow + ' ' + vr if vr else ''}")
         st.markdown(" \u00b7 ".join(parts))
 
-with st.expander("\U0001f4cb Detalle por habilidad", expanded=False):
+with st.expander("Detalle por habilidad", expanded=False):
     rows = []
     for name in sorted(current_dfs.keys(), key=lambda n: -skill_kpis[n]["recibidas"]["value"]):
         sk = skill_kpis[name]
@@ -600,14 +596,14 @@ if outbound_file is not None:
             chart_images["outbound_daily"] = str(save_chart(fig, chart_dir / "ob_daily.png"))
             plt.close(fig)
 
-        st.success(f"\U0001f4de Llamadas salientes cargadas: {ob_agg['total']:,} llamadas".replace(",", "."))
+        st.success(f"Llamadas salientes cargadas: {ob_agg['total']:,} llamadas".replace(",", "."))
     except Exception as e:
         st.error(f"Error al procesar llamadas salientes: {e}")
 
 # ---- Consultas sobre los datos ----
 from app.ai_engine.query_engine import answer_question
 
-with st.expander("\U0001f50e Consultar los datos", expanded=False):
+with st.expander("Consultar los datos", expanded=False):
     st.caption("Pregunt\u00e1 en lenguaje natural. Por ejemplo: "
                "*cu\u00e1ntas llamadas atendidas el 15 de junio en Turnos PM Estudios*")
 
@@ -636,7 +632,7 @@ from app.ai_engine.summary_builder import (
 )
 
 ai_texts = {}
-with st.expander("\U0001f4dd Resumen ejecutivo y conclusiones", expanded=True):
+with st.expander("Resumen ejecutivo y conclusiones", expanded=True):
     modo = st.radio(
         "\u00bfC\u00f3mo quer\u00e9s generar los textos?",
         ["Autom\u00e1tico (gratis, sin IA)", "Con IA (requiere API key)"],
@@ -659,7 +655,7 @@ with st.expander("\U0001f4dd Resumen ejecutivo y conclusiones", expanded=True):
                                                  label_visibility="collapsed")
         st.caption("Pod\u00e9s editar los textos antes de generar el reporte.")
 
-        with st.popover("\U0001f4ac Prefiero ped\u00edrselo a Claude.ai"):
+        with st.popover("Prefiero ped\u00edrselo a Claude.ai"):
             from app.ai_engine.client import build_kpi_summary
             st.markdown("Copi\u00e1 este texto y pegalo en claude.ai (o el chat que uses). "
                         "Despu\u00e9s peg\u00e1 la respuesta en los campos de arriba.")
@@ -702,7 +698,7 @@ with st.expander("\U0001f4dd Resumen ejecutivo y conclusiones", expanded=True):
                                                          height=180, label_visibility="collapsed")
 
 # Preview
-with st.expander("\U0001f441\ufe0f Vista previa de gr\u00e1ficos", expanded=False):
+with st.expander("Vista previa de gr\u00e1ficos", expanded=False):
     if "daily_all" in chart_images:
         st.image(chart_images["daily_all"], caption="Distribuci\u00f3n diaria \u2014 Todas las campa\u00f1as")
     for camp_name in CAMPAIGN_ORDER:
@@ -713,7 +709,7 @@ with st.expander("\U0001f441\ufe0f Vista previa de gr\u00e1ficos", expanded=Fals
 # ======================================================================
 # Generate PPTX
 # ======================================================================
-generate_btn = st.button("\U0001f680 Generar reporte PPTX", type="primary", use_container_width=True)
+generate_btn = st.button("Generar reporte", type="primary", use_container_width=True)
 
 if generate_btn:
     with st.spinner("Generando reporte..."):
@@ -814,12 +810,12 @@ if generate_btn:
             skills_reference=skills_ref,
         )
 
-    st.success(f"\u2705 Reporte generado exitosamente ({len(pptx_campaigns)} campa\u00f1as, {len(annexes)} anexos)")
+    st.success(f"Reporte generado ({len(pptx_campaigns)} campa\u00f1as, {len(annexes)} anexos)")
     slug = current_period.replace(" ", "_")
     col_pptx, col_pdf = st.columns(2)
     with col_pptx:
         st.download_button(
-            label="\U0001f4e5 Descargar PPTX",
+            label="Descargar PPTX",
             data=pptx_bytes,
             file_name=f"Reporte_CCenter_{slug}.pptx",
             mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
@@ -827,7 +823,7 @@ if generate_btn:
         )
     with col_pdf:
         st.download_button(
-            label="\U0001f4c4 Descargar PDF",
+            label="Descargar PDF",
             data=pdf_bytes,
             file_name=f"Reporte_CCenter_{slug}.pdf",
             mime="application/pdf",

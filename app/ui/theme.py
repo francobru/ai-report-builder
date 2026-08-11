@@ -38,6 +38,30 @@ WARN = "#B4791F"
 BAD = "#C0392B"
 
 
+def _render(markup: str) -> None:
+    """Send raw HTML/CSS to the page.
+
+    st.html() is the API meant for this: it does not go through Markdown,
+    so blank lines, asterisks in CSS comments and "*" selectors cannot be
+    mangled into visible text. st.markdown() is only a fallback for older
+    Streamlit versions.
+    """
+    body = _compact(markup)
+    if hasattr(st, "html"):
+        st.html(body)
+    else:
+        st.markdown(body, unsafe_allow_html=True)
+
+
+def _compact(markup: str) -> str:
+    """Remove blank lines from an HTML/CSS block.
+
+    Markdown ends a raw-HTML block at the first blank line, so anything
+    after it would be printed as literal text instead of being rendered.
+    """
+    return "\n".join(line for line in markup.splitlines() if line.strip())
+
+
 def _logo_data_uri() -> str:
     try:
         from app.report_generator.logo_data import LOGO_HA_APAISADO_B64
@@ -48,12 +72,9 @@ def _logo_data_uri() -> str:
 
 def inject_css() -> None:
     """Apply the theme. Call once per page, before anything is drawn."""
-    st.markdown(
-        """
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    _render("""
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
 :root {
   --ink: %(ink)s;
   --ink-soft: %(ink_soft)s;
@@ -254,17 +275,14 @@ hr { border-color: var(--line); }
             "paper": PAPER, "teal": TEAL, "teal_deep": TEAL_DEEP,
             "teal_soft": TEAL_SOFT, "gold": GOLD, "ok": OK,
             "warn": WARN, "bad": BAD,
-        },
-        unsafe_allow_html=True,
-    )
+        })
 
 
 def masthead(title: str, subtitle: str) -> None:
     """Header band with the hospital logo and the page title."""
     uri = _logo_data_uri()
     logo = f'<img src="{uri}" alt="Hospital Aleman">' if uri else ""
-    st.markdown(
-        f"""
+    _render(f"""
 <div class="ha-masthead">
   {logo}
   <div class="ha-rule"></div>
@@ -273,15 +291,12 @@ def masthead(title: str, subtitle: str) -> None:
     <p>{subtitle}</p>
   </div>
 </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    """)
 
 
 def step(number: int, title: str) -> None:
     """Section heading marked with the cross from the logo."""
-    st.markdown(
-        f"""
+    _render(f"""
 <div class="ha-step">
   <div class="ha-cross"></div>
   <div>
@@ -289,9 +304,7 @@ def step(number: int, title: str) -> None:
     <h3>{title}</h3>
   </div>
 </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    """)
 
 
 def card(label: str, value: str, sub: str = "", variation: str = "",
@@ -311,3 +324,16 @@ def card(label: str, value: str, sub: str = "", variation: str = "",
 def chip(text: str, muted: bool = False) -> str:
     """Return the HTML for a small labelled chip."""
     return f'<span class="ha-chip{" ha-muted" if muted else ""}">{text}</span>'
+
+
+def show_card(label: str, value: str, sub: str = "", variation: str = "",
+              accent: bool = False) -> None:
+    """Draw a metric card."""
+    _render(card(label, value, sub=sub, variation=variation, accent=accent))
+
+
+def show_chips(items, muted_when=None) -> None:
+    """Draw a row of chips. *muted_when* receives each item and returns bool."""
+    html = "".join(chip(t, muted=bool(muted_when(t)) if muted_when else False)
+                   for t in items)
+    _render(f"<div>{html}</div>")

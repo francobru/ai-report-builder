@@ -8,7 +8,8 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from app.ui.theme import masthead, step as ha_step, card as ha_card
+from app.ui.theme import (masthead, step as ha_step, card as ha_card,
+                          _render as ha_render)
 
 from app.data_loader.csv_loader import load_csv
 from app.data_loader.skill_mapper import extract_skill_name, extract_period
@@ -161,11 +162,9 @@ def render():
     cols = st.columns(3)
     for col, name, k in zip(cols, ["Plan Medico Total", "Turnos PM", "PM Consultas"], [k1, k2, k3]):
         with col:
-            st.markdown(
-                ha_card(name, k.get("recibidas", "-"),
+            ha_render(ha_card(name, k.get("recibidas", "-"),
                         sub=f'Nivel de atenci\u00f3n {k.get("nivel_atencion", "-")}',
-                        accent=True),
-                unsafe_allow_html=True)
+                        accent=True))
 
     with st.expander("Detalle por habilidad", expanded=True):
         rows = []
@@ -252,7 +251,7 @@ def render():
     # ---------------- Step 3: generate ----------------
     ha_step(3, "Generar y descargar el reporte")
 
-    if not st.button("Generar reporte PPTX", type="primary", use_container_width=True):
+    if not st.button("Generar reporte", type="primary", use_container_width=True):
         return
 
     with st.spinner("Generando..."):
@@ -328,7 +327,7 @@ def render():
 
     st.success("Reporte generado")
     st.download_button(
-        "Descargar reporte PPTX", data=pptx,
+        "Descargar PPTX", data=pptx,
         file_name=f"Reporte_PlanMedico_{period.replace(' ', '_')}.pptx",
         mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
         type="primary", use_container_width=True)
