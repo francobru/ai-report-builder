@@ -65,7 +65,7 @@ masthead("Productividad del Contact Center",
          "Genera el reporte mensual a partir de los CSV de Tecnovoz")
 
 # Version banner \u2014 lets you confirm at a glance which version is deployed
-APP_VERSION = "3.3.2"
+APP_VERSION = "3.3.3"
 st.caption(f"Versi\u00f3n {APP_VERSION} \u00b7 Dos tipos de reporte: Contact Center y Plan Medico")
 
 with st.sidebar:

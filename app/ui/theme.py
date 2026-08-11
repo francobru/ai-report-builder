@@ -100,7 +100,7 @@ html, body, [class*="css"], .stApp {
 
 .block-container {
   max-width: 1180px;
-  padding-top: 1.4rem;
+  padding-top: 3.4rem;
   padding-bottom: 4rem;
 }
 
@@ -267,6 +267,69 @@ hr { border-color: var(--line); }
   .ha-masthead { flex-direction: column; align-items: flex-start; gap: 0.8rem; }
   .ha-rule { display: none; }
   .ha-card .ha-value { font-size: 1.45rem; }
+}
+/* ---------- force the light appearance ---------- */
+/* The hospital identity is black on white. If the browser or the Streamlit
+   deployment is in dark mode, the widgets would render dark while this
+   stylesheet assumes light surfaces, leaving black inputs and unreadable
+   labels. These rules pin the surfaces and text colours. */
+.stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"] {
+  background: var(--mist) !important; color: var(--ink) !important;
+}
+[data-testid="stHeader"] { background: transparent !important; }
+[data-testid="stAppViewContainer"] * { color: var(--ink); }
+.ha-card .ha-label, .ha-card .ha-sub, .ha-titles p, .ha-step .ha-n,
+[data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] * {
+  color: var(--ink-soft) !important;
+}
+.ha-step .ha-n { color: var(--teal) !important; }
+.ha-up { color: var(--ok) !important; }
+.ha-down { color: var(--bad) !important; }
+/* Sidebar */
+section[data-testid="stSidebar"], section[data-testid="stSidebar"] > div {
+  background: var(--paper) !important;
+}
+section[data-testid="stSidebar"] * { color: var(--ink) !important; }
+section[data-testid="stSidebar"] [data-testid="stCaptionContainer"],
+section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] * {
+  color: var(--ink-soft) !important;
+}
+/* Text inputs, selects and text areas */
+input, textarea, select,
+[data-baseweb="input"], [data-baseweb="base-input"],
+[data-baseweb="input"] > div, [data-baseweb="select"] > div,
+[data-baseweb="popover"] div[role="listbox"] {
+  background: var(--paper) !important;
+  color: var(--ink) !important;
+  border-color: var(--line) !important;
+  -webkit-text-fill-color: var(--ink) !important;
+}
+input::placeholder, textarea::placeholder { color: #9AA5AD !important; }
+/* Widget labels */
+[data-testid="stWidgetLabel"], [data-testid="stWidgetLabel"] * , label {
+  color: var(--ink) !important;
+}
+/* File uploader */
+[data-testid="stFileUploader"] section,
+[data-testid="stFileUploaderDropzone"],
+[data-testid="stFileUploaderDropzoneInstructions"] {
+  background: var(--paper) !important;
+}
+[data-testid="stFileUploaderDropzoneInstructions"],
+[data-testid="stFileUploaderDropzoneInstructions"] * { color: var(--ink-soft) !important; }
+[data-testid="stFileUploader"] button {
+  background: var(--paper) !important; color: var(--ink) !important;
+  border: 1px solid var(--line) !important;
+}
+/* Surfaces that must stay white */
+[data-testid="stExpander"], [data-testid="stExpander"] details,
+[data-testid="stDataFrame"], [data-testid="stTable"], [data-testid="stPopoverBody"] {
+  background: var(--paper) !important;
+}
+/* Buttons keep their own palette */
+.stButton > button[kind="primary"], .stDownloadButton > button[kind="primary"],
+.stButton > button[kind="primary"] *, .stDownloadButton > button[kind="primary"] * {
+  color: #fff !important;
 }
 </style>
         """
