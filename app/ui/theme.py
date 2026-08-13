@@ -42,24 +42,23 @@ _TOKENS = {
     "ink": INK, "ink_soft": INK_SOFT, "line": LINE, "mist": MIST,
     "paper": PAPER, "teal": TEAL, "teal_deep": TEAL_DEEP,
     "teal_soft": TEAL_SOFT, "gold": GOLD, "ok": OK, "warn": WARN, "bad": BAD,
+    "radius": "10px",
 }
 
 
 def _render(markup: str) -> None:
     """Send raw HTML/CSS to the page.
 
-    st.html() is the API meant for this: it does not go through Markdown,
-    so blank lines, asterisks in CSS comments and "*" selectors cannot be
-    mangled into visible text. st.markdown() is only a fallback for older
-    Streamlit versions.
+    Blank lines are removed first: Markdown closes a raw-HTML block at the
+    first empty line, and everything after it would be printed as text.
     """
     for token, value in _TOKENS.items():
         markup = markup.replace("{{" + token + "}}", value)
-    body = _compact(markup)
-    if hasattr(st, "html"):
-        st.html(body)
-    else:
-        st.markdown(body, unsafe_allow_html=True)
+    # st.html() sanitises with DOMPurify, which strips <style> blocks and
+    # data: URIs, so custom theming never reaches the page. st.markdown with
+    # unsafe_allow_html does not sanitise; the only requirement is that the
+    # block has no blank lines, or Markdown ends the raw-HTML block early.
+    st.markdown(_compact(markup), unsafe_allow_html=True)
 
 
 def _compact(markup: str) -> str:
@@ -122,37 +121,19 @@ h1, h2, h3, h4 {
 /* Numbers should line up in tables and cards */
 .ha-value, [data-testid="stDataFrame"] { font-variant-numeric: tabular-nums; }
 
-/* ---------- masthead ---------- */
-.ha-masthead {
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 1.15rem 1.5rem 0.95rem;
-  margin-bottom: 1.6rem;
-  display: flex;
-  align-items: center;
-  gap: 1.5rem;
-  position: relative;
-  overflow: hidden;
+/* ---------- masthead (native container) ---------- */
+/* First bordered container on the page = the header band. */
+.stApp [data-testid="stVerticalBlockBorderWrapper"]:first-of-type {
+  background: {{paper}} !important;
+  border: 1px solid {{line}} !important;
+  border-radius: {{radius}} !important;
 }
-.ha-masthead::after {          /* accreditation hairline */
-  content: "";
-  position: absolute;
-  left: 0; right: 0; bottom: 0;
-  height: 2px;
-  background: linear-gradient(90deg, var(--teal) 0 62%, var(--gold) 62% 100%);
+.ha-accredit {
+  height: 2px; margin: -1px 0 1.5rem; border-radius: 0 0 2px 2px;
+  background: linear-gradient(90deg, {{teal}} 0 62%, {{gold}} 62% 100%);
 }
-.ha-masthead img { height: 46px; width: auto; display: block; }
-.ha-rule {
-  width: 1px; align-self: stretch; background: var(--line);
-  margin: 0.15rem 0;
-}
-.ha-titles h1 {
-  font-size: 1.32rem; font-weight: 600; margin: 0; line-height: 1.2;
-}
-.ha-titles p {
-  font-size: 0.86rem; color: var(--ink-soft); margin: 0.18rem 0 0;
-}
+.ha-titles h1 { font-size: 1.42rem; font-weight: 600; margin: 0; line-height: 1.2; }
+.ha-titles p { font-size: 0.88rem; color: {{ink_soft}}; margin: 0.2rem 0 0; }
 
 /* ---------- section headers: the cross from the logo ---------- */
 .ha-step {
@@ -456,20 +437,32 @@ table.ha-table tbody tr:hover { background: var(--teal-soft); }
         )
 
 
+def _logo_bytes() -> bytes | None:
+    try:
+        from app.report_generator.logo_data import LOGO_HA_APAISADO_B64
+        return base64.b64decode(LOGO_HA_APAISADO_B64)
+    except Exception:
+        return None
+
+
 def masthead(title: str, subtitle: str) -> None:
-    """Header band with the hospital logo and the page title."""
-    uri = _logo_data_uri()
-    logo = f'<img src="{uri}" alt="Hospital Aleman">' if uri else ""
-    _render(f"""
-<div class="ha-masthead">
-  {logo}
-  <div class="ha-rule"></div>
-  <div class="ha-titles">
-    <h1>{title}</h1>
-    <p>{subtitle}</p>
-  </div>
-</div>
-    """)
+    """Header with the hospital logo and the page title.
+
+    Built from native Streamlit elements (container + columns + image) so it
+    survives regardless of how custom HTML is handled.
+    """
+    with st.container(border=True):
+        logo = _logo_bytes()
+        if logo:
+            col_logo, col_txt = st.columns([1, 3], vertical_alignment="center")
+            with col_logo:
+                st.image(logo, width=230)
+        else:
+            col_txt = st.container()
+        with col_txt:
+            _render(f'<div class="ha-titles"><h1>{title}</h1>'
+                    f'<p>{subtitle}</p></div>')
+    _render('<div class="ha-accredit"></div>')
 
 
 def step(number: int, title: str) -> None:
