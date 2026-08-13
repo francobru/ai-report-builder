@@ -9,7 +9,7 @@ import pandas as pd
 import streamlit as st
 
 from app.ui.theme import (masthead, step as ha_step, card as ha_card,
-                          _render as ha_render)
+                          table as ha_table, _render as ha_render)
 
 from app.data_loader.csv_loader import load_csv
 from app.data_loader.skill_mapper import extract_skill_name, extract_period
@@ -176,7 +176,7 @@ def render():
             rows.append({"Habilidad": n, "Recibidas": kk["recibidas"],
                          "Atendidas": kk["atendidas"], "NA": kk["nivel_atencion"],
                          "Conv. prom.": kk["conversacion"]})
-        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        ha_table(rows)
 
     # ---------------- Closures ----------------
     closures_ctx = None

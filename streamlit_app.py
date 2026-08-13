@@ -44,7 +44,8 @@ kpi_defs = plugin.get_kpis()
 st.set_page_config(page_title="AI Report Builder", page_icon="\u2695\ufe0f", layout="wide")
 
 from app.ui.theme import (inject_css, masthead, step as ha_step,
-                          card as ha_card, chip as ha_chip, _render as ha_render)
+                          card as ha_card, chip as ha_chip,
+                          table as ha_table, _render as ha_render)
 
 inject_css()
 
@@ -63,10 +64,11 @@ if _report_type == "Productividad Mensual Plan Medico":
 
 masthead("Productividad del Contact Center",
          "Genera el reporte mensual a partir de los CSV de Tecnovoz")
+_scope_label = None
 
 # Version banner \u2014 lets you confirm at a glance which version is deployed
-APP_VERSION = "3.3.3"
-st.caption(f"Versi\u00f3n {APP_VERSION} \u00b7 Dos tipos de reporte: Contact Center y Plan Medico")
+APP_VERSION = "3.5"
+st.caption(f"Versi\u00f3n {APP_VERSION} \u00b7 Contact Center y Plan M\u00e9dico \u00b7 hist\u00f3rico en archivo")
 
 with st.sidebar:
     st.markdown("#### Como funciona")
@@ -110,6 +112,12 @@ with col_prev:
 st.markdown("**Llamadas salientes** \u00b7 opcional, archivo aparte")
 outbound_file = st.file_uploader("CSV de llamadas salientes", type=["csv"],
                                   accept_multiple_files=False, key="outbound")
+
+st.markdown("**Hist\u00f3rico de meses anteriores** \u00b7 recomendado")
+st.caption("El archivo que descargaste la vez anterior. Sirve para el gr\u00e1fico de "
+           "evoluci\u00f3n mensual: sin \u00e9l, el servidor puede haber perdido los meses previos.")
+history_file = st.file_uploader("CSV de hist\u00f3rico", type=["csv"],
+                                 accept_multiple_files=False, key="history")
 
 if not current_files:
     st.info("Sub\u00ed los archivos CSV del mes que quer\u00e9s reportar para empezar.")
@@ -208,6 +216,42 @@ for camp_name in CAMPAIGN_ORDER + ["Camp HA", "Sin asignar"]:
                 value=st.session_state.skill_selection.get(skill_name, True),
                 key=f"chk_{skill_name}",
             )
+
+# ---------------------------------------------------------------
+# Scope: the whole Contact Center, one campaign, or one skill.
+# Narrowing is done by pre-selecting the checkboxes above, so the rest of
+# the pipeline needs no special cases -- it simply receives fewer skills.
+# ---------------------------------------------------------------
+st.markdown("")
+_campanas = sorted({find_campaign(sk) for sk in all_skills} - {"Sin asignar"})
+_alcance = st.radio(
+    "Alcance del reporte",
+    ["Todo el Contact Center", "Una campana", "Una habilidad"],
+    horizontal=True,
+    help="Sirve para armar un reporte enfocado, por ejemplo solo Turnos o "
+         "solo la habilidad PM Consultas.",
+)
+
+_foco = None
+if _alcance == "Una campana" and _campanas:
+    _foco = st.selectbox("Campana", _campanas, key="scope_camp")
+    _objetivo = {sk for sk in all_skills if find_campaign(sk) == _foco}
+elif _alcance == "Una habilidad":
+    _foco = st.selectbox("Habilidad", sorted(all_skills), key="scope_skill")
+    _objetivo = {_foco}
+else:
+    _objetivo = None
+
+# Applying the scope rewrites the checkboxes, so what is on screen always
+# matches what the report will contain.
+if _objetivo is not None and st.session_state.get("_scope_applied") != (_alcance, _foco):
+    for sk in all_skills:
+        st.session_state.skill_selection[sk] = sk in _objetivo
+        st.session_state[f"chk_{sk}"] = sk in _objetivo
+    st.session_state._scope_applied = (_alcance, _foco)
+    st.rerun()
+if _objetivo is None:
+    st.session_state._scope_applied = None
 
 # Apply the selection to BOTH months
 current_dfs = {s: df for s, df in all_current_dfs.items()
@@ -373,7 +417,7 @@ with st.expander("Detalle por habilidad", expanded=False):
             "Prom Diario Rec": sk["promedio_recibidas"]["formatted"],
             "Prom Diario At": sk["promedio_atendidas"]["formatted"],
         })
-    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    ha_table(rows)
 
 # ======================================================================
 # Aggregate helpers
@@ -457,7 +501,9 @@ if len(daily_all) > 0:
 
 # Campaign volume + share
 camp_sorted = [c for c in CAMPAIGN_ORDER + ["Camp HA"] if c in campaign_kpis]
-if camp_sorted:
+# With a single campaign there is nothing to compare, so the volume and
+# share charts are skipped rather than drawn with one bar / one slice.
+if len(camp_sorted) > 1:
     rec = [campaign_kpis[c]["recibidas"]["value"] for c in camp_sorted]
     att = [campaign_kpis[c]["atendidas"]["value"] for c in camp_sorted]
     # Horizontal bars include ALL campaigns (Agendas, Camp HA too)
@@ -488,7 +534,23 @@ if top_skills:
     plt.close(fig)
 
 # ---- Monthly trend (evoluci\u00f3n mensual) ----
-from app.data_loader.monthly_history import get_trend, add_month
+from app.data_loader.monthly_history import (get_trend, add_month,
+                                              export_history_csv,
+                                              import_history_csv,
+                                              missing_months)
+
+# Load the uploaded history first, so the trend is complete before the
+# current month is added to it.
+if history_file is not None:
+    try:
+        _raw = history_file.read(); history_file.seek(0)
+        _n, _warn = import_history_csv(_raw.decode("utf-8-sig", errors="replace"))
+        if _n:
+            st.success(f"Hist\u00f3rico cargado: {_n} mes(es).")
+        for _w in _warn:
+            st.warning(_w)
+    except Exception as _e:
+        st.error(f"No pude leer el hist\u00f3rico: {_e}")
 from app.data_loader.skill_mapper import extract_period as _extract_period_full
 
 # Determine current month/year from the period label
@@ -533,18 +595,20 @@ if _period_info:
          "atendidas": r.atendidas, "nivel_atencion": r.nivel_atencion}
         for r in trend_records
     ]
-    # Warn about holes in the series (e.g. a month never reported, or lost when
-    # the server restarted). Uploading that month as "mes anterior" fills it.
-    _present = {r.month for r in trend_records}
-    _missing = [m for m in range(1, cur_month + 1) if m not in _present]
-    if _missing:
-        _names = {1:"Enero",2:"Febrero",3:"Marzo",4:"Abril",5:"Mayo",6:"Junio",
-                  7:"Julio",8:"Agosto",9:"Septiembre",10:"Octubre",
-                  11:"Noviembre",12:"Diciembre"}
-        st.warning("Faltan meses en la evolucion mensual: "
-                   + ", ".join(_names[m] for m in _missing)
-                   + ". Para completarlos, genera una vez el reporte de ese mes "
-                     "o cargalo como 'mes anterior'.")
+    # A gap means that month was never reported, or it was lost when the
+    # server restarted. Uploading the history file is what prevents this.
+    _faltan = missing_months(cur_year, cur_month)
+    if _faltan:
+        if history_file is None:
+            st.warning(
+                "Faltan meses en la evoluci\u00f3n mensual: " + ", ".join(_faltan) +
+                ". Sub\u00ed el archivo de hist\u00f3rico en el paso 1 (el que descargaste "
+                "la vez anterior) y vuelven a aparecer.")
+        else:
+            st.info(
+                "Faltan meses en la evoluci\u00f3n mensual: " + ", ".join(_faltan) +
+                ". El hist\u00f3rico que subiste no los incluye. Se completan generando "
+                "una vez el reporte de ese mes, o agregando la fila a mano en el CSV.")
 
     if len(monthly_trend_data) >= 2:
         fig = chart_grouped_bar_line(
@@ -617,7 +681,7 @@ with st.expander("Consultar los datos", expanded=False):
             st.success(res.answer)
             if res.detail is not None and len(res.detail) > 1:
                 with st.expander("Ver detalle diario"):
-                    st.dataframe(res.detail, use_container_width=True, hide_index=True)
+                    ha_table(res.detail, max_height=320)
         else:
             st.warning(res.answer)
             if res.suggestion:
@@ -810,8 +874,13 @@ if generate_btn:
             skills_reference=skills_ref,
         )
 
-    st.success(f"Reporte generado ({len(pptx_campaigns)} campa\u00f1as, {len(annexes)} anexos)")
+    _que = f"{_foco} \u00b7 " if _foco else ""
+    st.success(f"Reporte generado \u00b7 {_que}{len(pptx_campaigns)} secci\u00f3n(es), "
+               f"{len(annexes)} anexo(s)")
     slug = current_period.replace(" ", "_")
+    if _foco:
+        _clean = "".join(ch if ch.isalnum() else "_" for ch in _foco).strip("_")
+        slug = f"{_clean}_{slug}"
     col_pptx, col_pdf = st.columns(2)
     with col_pptx:
         st.download_button(
@@ -829,3 +898,16 @@ if generate_btn:
             mime="application/pdf",
             use_container_width=True,
         )
+
+    # The updated history: this month is already in it. The team saves it in
+    # the shared folder, replacing the previous copy.
+    _hist_csv = export_history_csv()
+    st.download_button(
+        label="Descargar hist\u00f3rico actualizado",
+        data=_hist_csv.encode("utf-8-sig"),
+        file_name="historico_contact_center.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
+    st.caption("Guardalo en la carpeta compartida pisando el anterior. "
+               "El mes que acabas de generar ya esta incluido.")

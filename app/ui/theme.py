@@ -38,6 +38,13 @@ WARN = "#B4791F"
 BAD = "#C0392B"
 
 
+_TOKENS = {
+    "ink": INK, "ink_soft": INK_SOFT, "line": LINE, "mist": MIST,
+    "paper": PAPER, "teal": TEAL, "teal_deep": TEAL_DEEP,
+    "teal_soft": TEAL_SOFT, "gold": GOLD, "ok": OK, "warn": WARN, "bad": BAD,
+}
+
+
 def _render(markup: str) -> None:
     """Send raw HTML/CSS to the page.
 
@@ -46,6 +53,8 @@ def _render(markup: str) -> None:
     mangled into visible text. st.markdown() is only a fallback for older
     Streamlit versions.
     """
+    for token, value in _TOKENS.items():
+        markup = markup.replace("{{" + token + "}}", value)
     body = _compact(markup)
     if hasattr(st, "html"):
         st.html(body)
@@ -76,18 +85,18 @@ def inject_css() -> None:
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
 :root {
-  --ink: %(ink)s;
-  --ink-soft: %(ink_soft)s;
-  --line: %(line)s;
-  --mist: %(mist)s;
-  --paper: %(paper)s;
-  --teal: %(teal)s;
-  --teal-deep: %(teal_deep)s;
-  --teal-soft: %(teal_soft)s;
-  --gold: %(gold)s;
-  --ok: %(ok)s;
-  --warn: %(warn)s;
-  --bad: %(bad)s;
+  --ink: {{ink}};
+  --ink-soft: {{ink_soft}};
+  --line: {{line}};
+  --mist: {{mist}};
+  --paper: {{paper}};
+  --teal: {{teal}};
+  --teal-deep: {{teal_deep}};
+  --teal-soft: {{teal_soft}};
+  --gold: {{gold}};
+  --ok: {{ok}};
+  --warn: {{warn}};
+  --bad: {{bad}};
   --radius: 10px;
 }
 
@@ -131,7 +140,7 @@ h1, h2, h3, h4 {
   position: absolute;
   left: 0; right: 0; bottom: 0;
   height: 2px;
-  background: linear-gradient(90deg, var(--teal) 0 62%%, var(--gold) 62%% 100%%);
+  background: linear-gradient(90deg, var(--teal) 0 62%, var(--gold) 62% 100%);
 }
 .ha-masthead img { height: 46px; width: auto; display: block; }
 .ha-rule {
@@ -174,7 +183,7 @@ h1, h2, h3, h4 {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 0.95rem 1.05rem;
-  height: 100%%;
+  height: 100%;
 }
 .ha-card .ha-label {
   font-size: 0.72rem; font-weight: 600; letter-spacing: 0.07em;
@@ -331,14 +340,120 @@ input::placeholder, textarea::placeholder { color: #9AA5AD !important; }
 .stButton > button[kind="primary"] *, .stDownloadButton > button[kind="primary"] * {
   color: #fff !important;
 }
+/* ---------- widgets that were still rendering dark ---------- */
+/* Tell the browser this document is light: native controls, scrollbars and
+   autofilled inputs follow this. */
+:root, html, body, .stApp { color-scheme: light !important; }
+
+/* Dropdown menus, popovers and tooltips are rendered in a PORTAL attached to
+   <body>, outside stAppViewContainer, so the earlier rules never reached them. */
+[data-baseweb="popover"], [data-baseweb="menu"], [data-baseweb="tooltip"],
+[data-baseweb="popover"] *, [data-baseweb="menu"] *,
+div[role="listbox"], div[role="listbox"] *,
+li[role="option"], ul[role="listbox"] {
+  background-color: var(--paper) !important;
+  color: var(--ink) !important;
+}
+li[role="option"]:hover, li[role="option"][aria-selected="true"] {
+  background-color: var(--teal-soft) !important;
+  color: var(--teal-deep) !important;
+}
+[data-baseweb="popover"] [data-baseweb="menu"] { border: 1px solid var(--line) !important; }
+
+/* Files already uploaded (the chips under each uploader) */
+[data-testid="stFileUploaderFile"],
+[data-testid="stFileUploaderFile"] *,
+[data-testid="stFileUploaderFileName"],
+[data-testid="stFileUploaderDeleteBtn"] {
+  background-color: transparent !important;
+  color: var(--ink) !important;
+}
+[data-testid="stFileUploaderFile"] {
+  border-top: 1px solid var(--line) !important;
+}
+[data-testid="stFileUploaderFile"] small,
+[data-testid="stFileUploaderFile"] span[aria-label] { color: var(--ink-soft) !important; }
+
+/* Expanders: header and body */
+[data-testid="stExpander"] summary,
+[data-testid="stExpander"] summary *,
+[data-testid="stExpander"] details > div,
+details[data-testid="stExpanderDetails"] {
+  background-color: var(--paper) !important;
+  color: var(--ink) !important;
+}
+[data-testid="stExpander"] summary:hover,
+[data-testid="stExpander"] summary:hover * { color: var(--teal-deep) !important; }
+[data-testid="stExpander"] summary svg { fill: var(--ink-soft) !important; }
+
+/* Checkboxes and radios */
+[data-testid="stCheckbox"], [data-testid="stRadio"],
+[data-testid="stCheckbox"] *, [data-testid="stRadio"] * { color: var(--ink) !important; }
+[data-testid="stCheckbox"] [data-baseweb="checkbox"] div[data-checked="true"],
+[data-testid="stRadio"] [role="radio"][aria-checked="true"] > div:first-child {
+  background-color: var(--teal) !important; border-color: var(--teal) !important;
+}
+
+/* Tabs */
+[data-baseweb="tab-list"], [data-baseweb="tab"] {
+  background-color: transparent !important; color: var(--ink-soft) !important;
+}
+[data-baseweb="tab"][aria-selected="true"] { color: var(--teal-deep) !important; }
+[data-baseweb="tab-highlight"] { background-color: var(--teal) !important; }
+
+/* Tables */
+[data-testid="stTable"] table, [data-testid="stTable"] th, [data-testid="stTable"] td {
+  background-color: var(--paper) !important; color: var(--ink) !important;
+  border-color: var(--line) !important;
+}
+
+/* Alerts, tinted with the palette instead of Streamlit's dark defaults */
+div[data-testid="stAlert"], div[data-testid="stAlert"] * {
+  color: var(--ink) !important;
+}
+div[data-testid="stAlert"] { background-color: var(--paper) !important; }
+div[data-testid="stAlertContentInfo"] { background-color: var(--teal-soft) !important; }
+div[data-testid="stAlertContentSuccess"] { background-color: #E7F4EC !important; }
+div[data-testid="stAlertContentWarning"] { background-color: #FDF3E2 !important; }
+div[data-testid="stAlertContentError"] { background-color: #FCEBEA !important; }
+
+/* Spinner, progress and toolbar */
+[data-testid="stSpinner"], [data-testid="stSpinner"] * { color: var(--ink-soft) !important; }
+[data-testid="stToolbar"] button { color: var(--ink-soft) !important; }
+
+/* Popover panels opened from a button */
+[data-testid="stPopoverBody"], [data-testid="stPopoverBody"] * {
+  background-color: var(--paper) !important; color: var(--ink) !important;
+}
+[data-testid="stPopoverBody"] code, [data-testid="stPopoverBody"] pre {
+  background-color: var(--mist) !important; color: var(--ink) !important;
+}
+
+/* Code blocks */
+pre, code, [data-testid="stCode"], [data-testid="stCode"] * {
+  background-color: var(--mist) !important; color: var(--ink) !important;
+}
+
+/* ---------- plain HTML table (used instead of st.dataframe) ---------- */
+/* st.dataframe draws on a canvas, so CSS cannot re-colour it. These tables
+   are rendered as HTML by theme.table() and therefore always match. */
+.ha-table-wrap { overflow-x: auto; border: 1px solid var(--line);
+                 border-radius: var(--radius); background: var(--paper); }
+table.ha-table { width: 100%; border-collapse: collapse; font-size: 0.84rem;
+                 font-variant-numeric: tabular-nums; }
+table.ha-table thead th {
+  background: var(--teal); color: #fff; font-weight: 600; text-align: right;
+  padding: 0.5rem 0.7rem; white-space: nowrap; position: sticky; top: 0;
+}
+table.ha-table thead th:first-child { text-align: left; }
+table.ha-table td { padding: 0.42rem 0.7rem; border-top: 1px solid var(--line);
+                    text-align: right; color: var(--ink); white-space: nowrap; }
+table.ha-table td:first-child { text-align: left; }
+table.ha-table tbody tr:nth-child(odd) { background: #FAFCFB; }
+table.ha-table tbody tr:hover { background: var(--teal-soft); }
 </style>
         """
-        % {
-            "ink": INK, "ink_soft": INK_SOFT, "line": LINE, "mist": MIST,
-            "paper": PAPER, "teal": TEAL, "teal_deep": TEAL_DEEP,
-            "teal_soft": TEAL_SOFT, "gold": GOLD, "ok": OK,
-            "warn": WARN, "bad": BAD,
-        })
+        )
 
 
 def masthead(title: str, subtitle: str) -> None:
@@ -400,3 +515,45 @@ def show_chips(items, muted_when=None) -> None:
     html = "".join(chip(t, muted=bool(muted_when(t)) if muted_when else False)
                    for t in items)
     _render(f"<div>{html}</div>")
+
+
+def _esc(v) -> str:
+    return (str(v).replace("&", "&amp;").replace("<", "&lt;")
+            .replace(">", "&gt;").replace('"', "&quot;"))
+
+
+def table(rows, headers=None, max_height: int | None = None) -> None:
+    """Render a data table as HTML.
+
+    st.dataframe paints on a canvas whose colours come from Streamlit's own
+    theme, so it stays dark when the deployment is in dark mode and no CSS
+    can change it. Rendering the table ourselves keeps it consistent.
+
+    *rows* may be a list of dicts, a list of lists, or a pandas DataFrame.
+    """
+    try:                                   # pandas DataFrame
+        if hasattr(rows, "to_dict") and hasattr(rows, "columns"):
+            headers = headers or [str(c) for c in rows.columns]
+            rows = rows.values.tolist()
+    except Exception:
+        pass
+
+    body = list(rows or [])
+    if body and isinstance(body[0], dict):
+        headers = headers or list(body[0].keys())
+        body = [[r.get(h, "") for h in headers] for r in body]
+
+    if not body:
+        _render('<div class="ha-table-wrap"><table class="ha-table">'
+                '<tbody><tr><td>Sin datos</td></tr></tbody></table></div>')
+        return
+
+    head = ""
+    if headers:
+        head = "<thead><tr>" + "".join(f"<th>{_esc(h)}</th>" for h in headers) + "</tr></thead>"
+    cells = "".join(
+        "<tr>" + "".join(f"<td>{_esc(c)}</td>" for c in row) + "</tr>" for row in body
+    )
+    style = f' style="max-height:{int(max_height)}px;overflow-y:auto"' if max_height else ""
+    _render(f'<div class="ha-table-wrap"{style}><table class="ha-table">'
+            f'{head}<tbody>{cells}</tbody></table></div>')
