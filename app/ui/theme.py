@@ -107,7 +107,7 @@ html, body, [class*="css"], .stApp {
 .stApp { background: var(--mist); }
 
 .block-container {
-  max-width: 1180px;
+  max-width: 1040px;
   padding-top: 3.4rem;
   padding-bottom: 4rem;
 }
@@ -136,10 +136,15 @@ h1, h2, h3, h4 {
 .ha-titles p { font-size: 0.88rem; color: {{ink_soft}}; margin: 0.2rem 0 0; }
 
 /* ---------- section headers: the cross from the logo ---------- */
+/* A rule above each step groups the page into blocks instead of leaving
+   every widget floating on the same background. */
 .ha-step {
   display: flex; align-items: center; gap: 0.7rem;
-  margin: 2.1rem 0 0.9rem;
+  margin: 2.4rem 0 1.1rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid {{line}};
 }
+.ha-step:first-of-type { border-top: 0; padding-top: 0; margin-top: 1.4rem; }
 .ha-cross {
   position: relative; flex: none;
   width: 20px; height: 20px; border-radius: 4px;
@@ -432,6 +437,19 @@ table.ha-table td { padding: 0.42rem 0.7rem; border-top: 1px solid var(--line);
 table.ha-table td:first-child { text-align: left; }
 table.ha-table tbody tr:nth-child(odd) { background: #FAFCFB; }
 table.ha-table tbody tr:hover { background: var(--teal-soft); }
+/* ---------- rhythm and containment ---------- */
+/* Labels sit closer to their control, and blocks breathe between them. */
+[data-testid="stWidgetLabel"] { margin-bottom: 0.15rem !important; }
+[data-testid="stVerticalBlock"] > div { gap: 0 !important; }
+[data-testid="stFileUploader"] { margin-bottom: 0.4rem; }
+[data-testid="stFileUploader"] section { padding: 0.85rem 1rem !important; }
+[data-testid="stExpander"] { margin: 0.45rem 0; }
+[data-testid="stCheckbox"] { padding: 0.1rem 0; }
+[data-testid="stRadio"] > div { gap: 1.1rem !important; }
+[data-testid="stCaptionContainer"] { margin-top: 0.15rem; }
+/* Group headings inside a step */
+.stMarkdown strong { color: {{ink}}; }
+hr { margin: 1.4rem 0; }
 </style>
         """
         )

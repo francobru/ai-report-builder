@@ -67,7 +67,7 @@ masthead("Productividad del Contact Center",
 _scope_label = None
 
 # Version banner \u2014 lets you confirm at a glance which version is deployed
-APP_VERSION = "3.5.1"
+APP_VERSION = "3.6"
 st.caption(f"Versi\u00f3n {APP_VERSION} \u00b7 Contact Center y Plan M\u00e9dico \u00b7 hist\u00f3rico en archivo")
 
 with st.sidebar:
@@ -78,18 +78,6 @@ with st.sidebar:
         "3. **Seleccion\u00e1** las habilidades a incluir\n"
         "4. Revis\u00e1 los KPIs\n"
         "5. Descarg\u00e1 el PPTX"
-    )
-    st.divider()
-    st.markdown("#### Resumen con IA")
-    st.caption("Opcional. Genera resumen ejecutivo y conclusiones.")
-    _default_key = ""
-    try:
-        _default_key = st.secrets.get("ANTHROPIC_API_KEY", "")
-    except Exception:
-        pass
-    api_key_input = st.text_input(
-        "API key de Anthropic", value=_default_key, type="password",
-        help="Se obtiene en console.anthropic.com. Si no la carg\u00e1s, el reporte se genera igual pero sin los textos de IA.",
     )
     st.divider()
     st.caption(f"v{APP_VERSION} \u00b7 Selecci\u00f3n + anexos + salientes + tendencia")
@@ -153,32 +141,89 @@ prev_dfs, prev_period = (({}, None) if not previous_files else load_file_set(pre
 # ======================================================================
 ha_step(2, "Elegir las habilidades que entran al reporte")
 
-# Init session state for selections
-if "skill_selection" not in st.session_state:
-    st.session_state.skill_selection = {}
-
-# The selector covers the UNION of both months, so a skill that only exists in
-# the previous month (e.g. Laboratorio) can also be excluded. Whatever is
-# unchecked is removed from BOTH months -- report and comparison stay in sync.
+# ---------------------------------------------------------------
+# Selection state
+#
+# The checkbox keys ("chk_<skill>") ARE the state. Streamlit forbids writing
+# a widget's key after the widget has been created, and ignores `value=` once
+# the key exists -- which is why changing a separate dict did nothing. Every
+# change therefore happens inside a callback, which runs before the widgets
+# are rebuilt on the next run.
+# ---------------------------------------------------------------
 all_skills = sorted(set(all_current_dfs) | set(prev_dfs))
 skills_key = tuple(all_skills)
-if st.session_state.get("_skills_key") != skills_key:
-    st.session_state.skill_selection = {s: True for s in all_skills}
-    st.session_state._skills_key = skills_key
 
+if st.session_state.get("_skills_key") != skills_key:
+    for _k in [k for k in st.session_state if k.startswith("chk_")]:
+        del st.session_state[_k]
+    st.session_state._skills_key = skills_key
+    st.session_state.pop("scope_mode", None)
+
+for _sk in all_skills:
+    st.session_state.setdefault(f"chk_{_sk}", True)
+
+
+def _set_all(value: bool) -> None:
+    for sk in all_skills:
+        st.session_state[f"chk_{sk}"] = value
+
+
+def _apply_scope() -> None:
+    """Tick exactly the skills the chosen scope covers.
+
+    The callback runs BEFORE the campaign/skill selectbox is created, so on
+    the run where the scope changes its key does not exist yet. Falling back
+    to the first option keeps it in step with what the selectbox will show.
+    """
+    modo = st.session_state.get("scope_mode", "Todo el Contact Center")
+    campanas = sorted({find_campaign(sk) for sk in all_skills} - {"Sin asignar"})
+
+    if modo == "Una campana":
+        camp = st.session_state.get("scope_camp")
+        if camp not in campanas:
+            camp = campanas[0] if campanas else None
+        objetivo = {sk for sk in all_skills if find_campaign(sk) == camp}
+    elif modo == "Una habilidad":
+        elegida = st.session_state.get("scope_skill")
+        if elegida not in all_skills:
+            elegida = sorted(all_skills)[0] if all_skills else None
+        objetivo = {elegida} if elegida else set()
+    else:
+        objetivo = set(all_skills)
+
+    for sk in all_skills:
+        st.session_state[f"chk_{sk}"] = sk in objetivo
+
+
+_campanas = sorted({find_campaign(sk) for sk in all_skills} - {"Sin asignar"})
+
+st.markdown("**Alcance**")
+_alcance = st.radio(
+    "Alcance del reporte", ["Todo el Contact Center", "Una campana", "Una habilidad"],
+    horizontal=True, key="scope_mode", on_change=_apply_scope,
+    label_visibility="collapsed",
+    help="Para armar un reporte enfocado, por ejemplo solo Turnos o solo la "
+         "habilidad PM Consultas.",
+)
+
+_foco = None
+if _alcance == "Una campana" and _campanas:
+    _foco = st.selectbox("Campana", _campanas, key="scope_camp",
+                         on_change=_apply_scope)
+elif _alcance == "Una habilidad" and all_skills:
+    _foco = st.selectbox("Habilidad", sorted(all_skills), key="scope_skill",
+                         on_change=_apply_scope)
+
+st.markdown("")
 col_all, col_none, col_info = st.columns([1, 1, 3])
 with col_all:
-    if st.button("Seleccionar todas", use_container_width=True):
-        for s in all_skills:
-            st.session_state.skill_selection[s] = True
-        st.rerun()
+    st.button("Seleccionar todas", use_container_width=True,
+              on_click=_set_all, args=(True,))
 with col_none:
-    if st.button("Deseleccionar todas", use_container_width=True):
-        for s in all_skills:
-            st.session_state.skill_selection[s] = False
-        st.rerun()
+    st.button("Deseleccionar todas", use_container_width=True,
+              on_click=_set_all, args=(False,))
 with col_info:
-    n_selected = sum(1 for s in all_skills if st.session_state.skill_selection.get(s))
+    n_selected = sum(1 for s in all_skills if st.session_state.get(f"chk_{s}"))
     st.markdown(f"**{n_selected} de {len(all_skills)}** habilidades seleccionadas")
 
 if prev_dfs:
@@ -187,77 +232,31 @@ if prev_dfs:
 
 classification_all = {}
 for skill in all_skills:
-    camp = find_campaign(skill)
-    classification_all.setdefault(camp, []).append({"skill": skill})
+    classification_all.setdefault(find_campaign(skill), []).append(skill)
 
 for camp_name in CAMPAIGN_ORDER + ["Camp HA", "Sin asignar"]:
     if camp_name not in classification_all:
         continue
-    skills = classification_all[camp_name]
     ha_render(ha_chip(camp_name, muted=(camp_name == "Sin asignar")))
-
     cols = st.columns(4)
-    for i, sk in enumerate(skills):
-        skill_name = sk["skill"]
-        # Mark skills that are not present in both months
+    for i, skill_name in enumerate(classification_all[camp_name]):
+        label = skill_name
         if prev_dfs:
-            in_cur, in_prev = skill_name in all_current_dfs, skill_name in prev_dfs
+            in_cur = skill_name in all_current_dfs
+            in_prev = skill_name in prev_dfs
             if in_cur and not in_prev:
                 label = f"{skill_name}  (solo {current_period})"
             elif in_prev and not in_cur:
                 label = f"{skill_name}  (solo {prev_period})"
-            else:
-                label = skill_name
-        else:
-            label = skill_name
         with cols[i % 4]:
-            st.session_state.skill_selection[skill_name] = st.checkbox(
-                label,
-                value=st.session_state.skill_selection.get(skill_name, True),
-                key=f"chk_{skill_name}",
-            )
-
-# ---------------------------------------------------------------
-# Scope: the whole Contact Center, one campaign, or one skill.
-# Narrowing is done by pre-selecting the checkboxes above, so the rest of
-# the pipeline needs no special cases -- it simply receives fewer skills.
-# ---------------------------------------------------------------
-st.markdown("")
-_campanas = sorted({find_campaign(sk) for sk in all_skills} - {"Sin asignar"})
-_alcance = st.radio(
-    "Alcance del reporte",
-    ["Todo el Contact Center", "Una campana", "Una habilidad"],
-    horizontal=True,
-    help="Sirve para armar un reporte enfocado, por ejemplo solo Turnos o "
-         "solo la habilidad PM Consultas.",
-)
-
-_foco = None
-if _alcance == "Una campana" and _campanas:
-    _foco = st.selectbox("Campana", _campanas, key="scope_camp")
-    _objetivo = {sk for sk in all_skills if find_campaign(sk) == _foco}
-elif _alcance == "Una habilidad":
-    _foco = st.selectbox("Habilidad", sorted(all_skills), key="scope_skill")
-    _objetivo = {_foco}
-else:
-    _objetivo = None
-
-# Applying the scope rewrites the checkboxes, so what is on screen always
-# matches what the report will contain.
-if _objetivo is not None and st.session_state.get("_scope_applied") != (_alcance, _foco):
-    for sk in all_skills:
-        st.session_state.skill_selection[sk] = sk in _objetivo
-        st.session_state[f"chk_{sk}"] = sk in _objetivo
-    st.session_state._scope_applied = (_alcance, _foco)
-    st.rerun()
-if _objetivo is None:
-    st.session_state._scope_applied = None
+            # No `value=`: the key alone holds the state.
+            st.checkbox(label, key=f"chk_{skill_name}")
 
 # Apply the selection to BOTH months
 current_dfs = {s: df for s, df in all_current_dfs.items()
-               if st.session_state.skill_selection.get(s, False)}
+               if st.session_state.get(f"chk_{s}")}
 prev_dfs = {s: df for s, df in prev_dfs.items()
-            if st.session_state.skill_selection.get(s, False)}
+            if st.session_state.get(f"chk_{s}")}
 
 if not current_dfs:
     st.warning("\u26a0\ufe0f No hay habilidades seleccionadas. Marc\u00e1 al menos una para generar el reporte.")
@@ -691,75 +690,26 @@ with st.expander("Consultar los datos", expanded=False):
                "son exactas y no se env\u00eda ning\u00fan dato fuera de la aplicaci\u00f3n.")
 
 # ---- Resumen ejecutivo y conclusiones ----
-from app.ai_engine.summary_builder import (
-    build_executive_summary, build_conclusions, build_prompt_for_manual_ai,
-)
+# Built from the report's own figures: free, instant, nothing leaves the app
+# and no number can be invented.
+from app.ai_engine.summary_builder import build_executive_summary, build_conclusions
 
 ai_texts = {}
 with st.expander("Resumen ejecutivo y conclusiones", expanded=True):
-    modo = st.radio(
-        "\u00bfC\u00f3mo quer\u00e9s generar los textos?",
-        ["Autom\u00e1tico (gratis, sin IA)", "Con IA (requiere API key)"],
-        horizontal=True,
-        help="El modo autom\u00e1tico arma los textos con los n\u00fameros reales del reporte. "
-             "No manda datos a ning\u00fan servidor externo y no tiene costo.",
-    )
+    st.caption("Se arman con los numeros del propio reporte. Podes editarlos "
+               "antes de generar el PPTX.")
 
-    if modo.startswith("Autom\u00e1tico"):
-        resumen_auto = build_executive_summary(
-            current_period, global_kpis, global_variations, campaign_kpis, prev_period)
-        conclusiones_auto = build_conclusions(
-            current_period, global_kpis, global_variations, campaign_kpis, skill_kpis)
+    _resumen = build_executive_summary(
+        current_period, global_kpis, global_variations, campaign_kpis, prev_period)
+    _conclusiones = build_conclusions(
+        current_period, global_kpis, global_variations, campaign_kpis, skill_kpis)
 
-        st.markdown("**Resumen ejecutivo**")
-        ai_texts["resumen"] = st.text_area("resumen", resumen_auto, height=130,
-                                            label_visibility="collapsed")
-        st.markdown("**Conclusiones**")
-        ai_texts["conclusiones"] = st.text_area("conclusiones", conclusiones_auto, height=180,
-                                                 label_visibility="collapsed")
-        st.caption("Pod\u00e9s editar los textos antes de generar el reporte.")
-
-        with st.popover("Prefiero ped\u00edrselo a Claude.ai"):
-            from app.ai_engine.client import build_kpi_summary
-            st.markdown("Copi\u00e1 este texto y pegalo en claude.ai (o el chat que uses). "
-                        "Despu\u00e9s peg\u00e1 la respuesta en los campos de arriba.")
-            st.code(build_prompt_for_manual_ai(
-                current_period, build_kpi_summary(global_kpis, global_variations)),
-                language=None)
-
-    else:
-        if not api_key_input:
-            st.warning("Carg\u00e1 una API key de Anthropic en la barra lateral para usar este modo.")
-        else:
-            from app.ai_engine.client import AIEngine, build_kpi_summary
-            if st.button("Generar textos con IA", use_container_width=True):
-                engine = AIEngine(api_key=api_key_input)
-                if not engine.is_available:
-                    st.error("No se pudo conectar con la IA. Revis\u00e1 la API key.")
-                else:
-                    prompts = plugin.get_prompts()
-                    kpi_summary = build_kpi_summary(global_kpis, global_variations)
-                    camp_lines = [
-                        f"- {c}: recibidas {campaign_kpis[c]['recibidas']['formatted']}, "
-                        f"atendidas {campaign_kpis[c]['atendidas']['formatted']}, "
-                        f"NA {campaign_kpis[c]['nivel_atencion']['formatted']}"
-                        for c in CAMPAIGN_ORDER if c in campaign_kpis
-                    ]
-                    full_summary = kpi_summary + "\n\nPor campa\u00f1a:\n" + "\n".join(camp_lines)
-                    with st.spinner("Redactando..."):
-                        st.session_state["ai_resumen"] = engine.generate_executive_summary(
-                            prompts, full_summary, current_period)
-                        st.session_state["ai_conclusiones"] = engine.generate_conclusions(
-                            prompts, full_summary, current_period)
-
-            if "ai_resumen" in st.session_state:
-                st.markdown("**Resumen ejecutivo**")
-                ai_texts["resumen"] = st.text_area("resumen", st.session_state["ai_resumen"],
-                                                    height=130, label_visibility="collapsed")
-                st.markdown("**Conclusiones**")
-                ai_texts["conclusiones"] = st.text_area("conclusiones",
-                                                         st.session_state["ai_conclusiones"],
-                                                         height=180, label_visibility="collapsed")
+    st.markdown("**Resumen ejecutivo**")
+    ai_texts["resumen"] = st.text_area("resumen", _resumen, height=130,
+                                        label_visibility="collapsed")
+    st.markdown("**Conclusiones**")
+    ai_texts["conclusiones"] = st.text_area("conclusiones", _conclusiones, height=180,
+                                             label_visibility="collapsed")
 
 # Preview
 with st.expander("Vista previa de gr\u00e1ficos", expanded=False):
