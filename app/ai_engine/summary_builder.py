@@ -89,61 +89,65 @@ def build_conclusions(
     variations: dict[str, dict] | None = None,
     campaign_kpis: dict[str, dict] | None = None,
     skill_kpis: dict[str, dict] | None = None,
-    na_target: float = 85.0,
 ) -> str:
-    """Compose a bulleted conclusions block from the KPI values."""
+    """Compose a bulleted conclusions block from the KPI values.
+
+    No service-level target is assumed: none has been agreed yet, so the text
+    describes and ranks what happened instead of judging it against a number
+    that would be invented here.
+    """
     variations = variations or {}
     campaign_kpis = campaign_kpis or {}
     skill_kpis = skill_kpis or {}
 
     lines: list[str] = []
 
-    # 1. Overall attention level vs target
-    na_val = kpis["nivel_atencion"]["value"]
+    # 1. Overall attention level, stated plainly
     na_fmt = kpis["nivel_atencion"]["formatted"]
-    if na_val >= 90:
-        lines.append(f"\u2022 El nivel de atenci\u00f3n general de {na_fmt} se ubica en un rango "
-                     f"satisfactorio, por encima del objetivo de {na_target:.0f}%.")
-    elif na_val >= na_target:
-        lines.append(f"\u2022 El nivel de atenci\u00f3n general de {na_fmt} supera el objetivo de "
-                     f"{na_target:.0f}%, aunque con margen de mejora.")
+    var_na = variations.get("nivel_atencion")
+    if var_na and var_na.get("variation_pct") is not None:
+        verbo = _dir_word(var_na, "mejor\u00f3", "descendi\u00f3", "se mantuvo estable")
+        lines.append(f"\u2022 El nivel de atenci\u00f3n general fue de {na_fmt} y {verbo} "
+                     f"{_clean_pct(var_na)} respecto al mes anterior.")
     else:
-        lines.append(f"\u2022 El nivel de atenci\u00f3n general de {na_fmt} se encuentra por debajo "
-                     f"del objetivo de {na_target:.0f}%, lo que requiere atenci\u00f3n.")
+        lines.append(f"\u2022 El nivel de atenci\u00f3n general del per\u00edodo fue de {na_fmt}.")
 
     # 2. Volume trend
     var_rec = variations.get("recibidas")
     if var_rec and var_rec.get("variation_pct") is not None:
-        verbo = _dir_word(var_rec, "un incremento", "una reducci\u00f3n")
+        verbo = _dir_word(var_rec, "un incremento", "una reducci\u00f3n", "sin variaci\u00f3n")
         lines.append(f"\u2022 El volumen de llamadas present\u00f3 {verbo} del "
                      f"{_clean_pct(var_rec)} respecto al mes anterior.")
 
-    # 3. Campaigns below target
-    bajo = [(c, k) for c, k in campaign_kpis.items()
-            if k["nivel_atencion"]["value"] < na_target]
-    if bajo:
-        bajo.sort(key=lambda kv: kv[1]["nivel_atencion"]["value"])
-        detalle = ", ".join(f"{c} ({k['nivel_atencion']['formatted']})" for c, k in bajo)
-        lines.append(f"\u2022 Campa\u00f1as por debajo del objetivo de atenci\u00f3n: {detalle}.")
+    # 3. Spread between campaigns: the useful comparison without a target
+    if len(campaign_kpis) >= 2:
+        orden = sorted(campaign_kpis.items(),
+                       key=lambda kv: kv[1]["nivel_atencion"]["value"])
+        peor, mejor = orden[0], orden[-1]
+        lines.append(f"\u2022 El nivel de atenci\u00f3n vari\u00f3 entre {peor[1]['nivel_atencion']['formatted']} "
+                     f"({peor[0]}) y {mejor[1]['nivel_atencion']['formatted']} ({mejor[0]}).")
     elif campaign_kpis:
-        lines.append("\u2022 Todas las campa\u00f1as alcanzaron o superaron el objetivo de nivel de atenci\u00f3n.")
+        c, k = next(iter(campaign_kpis.items()))
+        lines.append(f"\u2022 {c} registr\u00f3 un nivel de atenci\u00f3n de "
+                     f"{k['nivel_atencion']['formatted']}.")
 
-    # 4. Best performing campaign
+    # 4. Campaign carrying most of the volume
     if campaign_kpis:
-        mejor = max(campaign_kpis.items(), key=lambda kv: kv[1]["nivel_atencion"]["value"])
-        lines.append(f"\u2022 {mejor[0]} registr\u00f3 el mejor nivel de atenci\u00f3n del per\u00edodo "
-                     f"({mejor[1]['nivel_atencion']['formatted']}).")
+        top = max(campaign_kpis.items(), key=lambda kv: kv[1]["recibidas"]["value"])
+        total = sum(k["recibidas"]["value"] for k in campaign_kpis.values())
+        share = (top[1]["recibidas"]["value"] / total * 100) if total else 0
+        lines.append(f"\u2022 {top[0]} concentr\u00f3 el {share:.0f}% de las llamadas recibidas "
+                     f"({top[1]['recibidas']['formatted']}).".replace(".0%", "%"))
 
-    # 5. Skills needing review
+    # 5. Skills with the lowest attention level, by volume relevance
     if skill_kpis:
-        criticas = [(s, k) for s, k in skill_kpis.items()
-                    if k["nivel_atencion"]["value"] < na_target
-                    and k["recibidas"]["value"] >= 100]
-        if criticas:
-            criticas.sort(key=lambda kv: kv[1]["nivel_atencion"]["value"])
-            top3 = ", ".join(f"{s} ({k['nivel_atencion']['formatted']})"
-                             for s, k in criticas[:3])
-            lines.append(f"\u2022 Habilidades con mayor oportunidad de mejora: {top3}.")
+        relevantes = [(s, k) for s, k in skill_kpis.items()
+                      if k["recibidas"]["value"] >= 100]
+        if len(relevantes) >= 5:
+            relevantes.sort(key=lambda kv: kv[1]["nivel_atencion"]["value"])
+            bajos = ", ".join(f"{s} ({k['nivel_atencion']['formatted']})"
+                              for s, k in relevantes[:3])
+            lines.append(f"\u2022 Las habilidades con menor nivel de atenci\u00f3n fueron: {bajos}.")
 
     # 6. Operational times
     conv = kpis.get("tiempo_conversacion", {}).get("formatted")

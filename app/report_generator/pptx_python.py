@@ -622,11 +622,12 @@ def _build_outbound_slide(prs, outbound, chart_images, page_num, total_pages, pe
                  "Completar manualmente \u2014 fuente: registro de cancelaciones de supervisores",
                  font_size=8, italic=True, color=TEXT_GRAY, alignment=PP_ALIGN.CENTER)
 
-    # Two charts side by side
+    # Stacked full width: side by side left each chart at ~6 inches, which
+    # shrank the labels to around 4 pt on the slide.
     if chart_images.get("outbound_result"):
-        _add_chart_image(slide, chart_images["outbound_result"], 0.3, 2.7, 6.2, 4.0)
+        _add_chart_image(slide, chart_images["outbound_result"], 0.35, 2.50, 12.6, 2.01)
     if chart_images.get("outbound_daily"):
-        _add_chart_image(slide, chart_images["outbound_daily"], 6.7, 2.7, 6.3, 4.0)
+        _add_chart_image(slide, chart_images["outbound_daily"], 0.35, 4.56, 12.6, 2.32)
 
 
 def _build_monthly_trend_slide(prs, trend_records, chart_path, page_num, total_pages, period):

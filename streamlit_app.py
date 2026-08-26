@@ -27,7 +27,8 @@ from app.kpi_engine.calculator import compute_kpis, compute_variation
 from app.chart_engine.renderer import (
     chart_daily_distribution, chart_donut,
     chart_grouped_bar_line, chart_horizontal_bars,
-    chart_vertical_bars, save_chart,
+    chart_vertical_bars, chart_outbound_results, chart_outbound_daily,
+    save_chart,
 )
 from app.chart_engine.chart_styles import apply_global_style
 from app.plugins.contact_center.plugin import ContactCenterPlugin
@@ -67,7 +68,7 @@ masthead("Productividad del Contact Center",
 _scope_label = None
 
 # Version banner \u2014 lets you confirm at a glance which version is deployed
-APP_VERSION = "3.6"
+APP_VERSION = "4.0"
 st.caption(f"Versi\u00f3n {APP_VERSION} \u00b7 Contact Center y Plan M\u00e9dico \u00b7 hist\u00f3rico en archivo")
 
 with st.sidebar:
@@ -80,35 +81,92 @@ with st.sidebar:
         "5. Descarg\u00e1 el PPTX"
     )
     st.divider()
-    st.caption(f"v{APP_VERSION} \u00b7 Selecci\u00f3n + anexos + salientes + tendencia")
+    st.caption(f"v{APP_VERSION} \u00b7 Asistente por pasos")
+
+# ======================================================================
+# Wizard state
+#
+# One step at a time. Widgets are only rendered on their own step, so
+# anything that must survive is copied into plain (non-widget) keys, which
+# Streamlit does not garbage-collect.
+# ======================================================================
+PASOS = ["Subir archivos", "Elegir alcance", "Revisar indicadores", "Generar reporte"]
+_paso = st.session_state.setdefault("paso", 1)
+
+
+def _ir_a(n: int) -> None:
+    st.session_state.paso = n
+
+
+def _barra_progreso(actual: int) -> None:
+    tramos = "".join(
+        f'<div style="flex:1;height:5px;border-radius:3px;background:'
+        f'{"#0B6E63" if i < actual else "#E4E9E8"}"></div>'
+        for i in range(1, len(PASOS) + 1))
+    ha_render(
+        f'<div style="display:flex;gap:.45rem;margin:1.4rem 0 .7rem">{tramos}</div>'
+        f'<div style="font:600 .72rem Inter,sans-serif;letter-spacing:.09em;'
+        f'text-transform:uppercase;color:#0B6E63">Paso {actual} de {len(PASOS)}</div>'
+        f'<h2 style="font-family:Outfit,Inter,sans-serif;font-size:1.35rem;'
+        f'font-weight:600;margin:.15rem 0 1.1rem">{PASOS[actual - 1]}</h2>')
+
+
+_barra_progreso(_paso)
 
 # ======================================================================
 # Step 1: Upload
 # ======================================================================
-ha_step(1, "Subir los archivos CSV")
+if _paso == 1:
 
-col_cur, col_prev = st.columns(2)
-with col_cur:
-    st.markdown("**Mes actual** \u00b7 obligatorio")
-    current_files = st.file_uploader("CSVs del mes a reportar", type=["csv"],
-                                      accept_multiple_files=True, key="current")
-with col_prev:
-    st.markdown("**Mes anterior** \u00b7 opcional, para comparar")
-    previous_files = st.file_uploader("CSVs del mes anterior", type=["csv"],
-                                       accept_multiple_files=True, key="previous")
+    col_cur, col_prev = st.columns(2)
+    with col_cur:
+        st.markdown("**Mes actual** \u00b7 obligatorio")
+        st.file_uploader("CSVs del mes a reportar", type=["csv"],
+                         accept_multiple_files=True, key="current")
+    with col_prev:
+        st.markdown("**Mes anterior** \u00b7 opcional, para comparar")
+        st.file_uploader("CSVs del mes anterior", type=["csv"],
+                         accept_multiple_files=True, key="previous")
 
-st.markdown("**Llamadas salientes** \u00b7 opcional, archivo aparte")
-outbound_file = st.file_uploader("CSV de llamadas salientes", type=["csv"],
-                                  accept_multiple_files=False, key="outbound")
+    st.markdown("**Llamadas salientes** \u00b7 opcional, archivo aparte")
+    st.file_uploader("CSV de llamadas salientes", type=["csv"],
+                     accept_multiple_files=False, key="outbound")
 
-st.markdown("**Hist\u00f3rico de meses anteriores** \u00b7 recomendado")
-st.caption("El archivo que descargaste la vez anterior. Sirve para el gr\u00e1fico de "
-           "evoluci\u00f3n mensual: sin \u00e9l, el servidor puede haber perdido los meses previos.")
-history_file = st.file_uploader("CSV de hist\u00f3rico", type=["csv"],
-                                 accept_multiple_files=False, key="history")
+    st.markdown("**Hist\u00f3rico de meses anteriores** \u00b7 recomendado")
+    st.caption("El archivo que descargaste la vez anterior. Sirve para el gr\u00e1fico de "
+               "evoluci\u00f3n mensual: sin \u00e9l, el servidor puede haber perdido los meses previos.")
+    st.file_uploader("CSV de hist\u00f3rico", type=["csv"],
+                     accept_multiple_files=False, key="history")
 
-if not current_files:
-    st.info("Sub\u00ed los archivos CSV del mes que quer\u00e9s reportar para empezar.")
+    # Coming back to step 1 re-renders the uploaders empty, because Streamlit
+    # drops the state of widgets that were off screen. The parsed data is
+    # still cached, so the already-loaded files are shown and reused instead
+    # of forcing the user to pick them again.
+    _cur = st.session_state.get("current") or []
+    _cache = st.session_state.get("archivos")
+    _nombres_now = [f.name for f in _cur]
+
+    if _cur and _nombres_now != (_cache or {}).get("nombres"):
+        st.session_state.pop("archivos", None)          # a new upload replaces it
+        _cache = None
+
+    st.markdown("")
+    if not _cur and _cache:
+        st.success(f"Ya ten\u00e9s cargados {len(_cache['current'])} archivo(s) de "
+                   f"{_cache['current_period']}. Pod\u00e9s continuar, o subir otros "
+                   f"para reemplazarlos.")
+    elif not _cur:
+        st.info("Sub\u00ed al menos los CSV del mes que quer\u00e9s reportar.")
+
+    _puede = bool(_cur) or bool(_cache)
+    _c1, _c2 = st.columns([3, 1])
+    with _c2:
+        if st.button("Continuar", type="primary", use_container_width=True,
+                     disabled=not _puede):
+            st.session_state.pop("seleccion", None)
+            st.session_state.pop("reporte", None)
+            _ir_a(2)
+            st.rerun()
     st.stop()
 
 # ======================================================================
@@ -133,133 +191,183 @@ def load_file_set(uploaded_files):
     return dfs, period_label or "Per\u00edodo desconocido"
 
 
-all_current_dfs, current_period = load_file_set(current_files)
-prev_dfs, prev_period = (({}, None) if not previous_files else load_file_set(previous_files))
+# The uploaders only exist on step 1, so the parsed data is cached here and
+# reused from step 2 onwards.
+current_files = st.session_state.get("current") or []
+previous_files = st.session_state.get("previous") or []
+outbound_file = st.session_state.get("outbound")
+history_file = st.session_state.get("history")
+
+if "archivos" not in st.session_state:
+    with st.spinner("Leyendo los archivos..."):
+        _cur_dfs, _cur_per = load_file_set(current_files)
+        _prev_dfs, _prev_per = (({}, None) if not previous_files
+                                else load_file_set(previous_files))
+    st.session_state["archivos"] = {
+        "current": _cur_dfs, "current_period": _cur_per,
+        "prev": _prev_dfs, "prev_period": _prev_per,
+        "nombres": [f.name for f in current_files],
+    }
+
+_arch = st.session_state["archivos"]
+all_current_dfs = _arch["current"]
+current_period = _arch["current_period"]
+prev_dfs = _arch["prev"]
+prev_period = _arch["prev_period"]
+
+if not all_current_dfs:
+    st.error("No pude leer ninguna habilidad de los archivos cargados.")
+    if st.button("Volver a subir archivos"):
+        st.session_state.pop("archivos", None)
+        _ir_a(1); st.rerun()
+    st.stop()
 
 # ======================================================================
 # Step 2: Skill selection
 # ======================================================================
-ha_step(2, "Elegir las habilidades que entran al reporte")
+if _paso == 2:
 
-# ---------------------------------------------------------------
-# Selection state
-#
-# The checkbox keys ("chk_<skill>") ARE the state. Streamlit forbids writing
-# a widget's key after the widget has been created, and ignores `value=` once
-# the key exists -- which is why changing a separate dict did nothing. Every
-# change therefore happens inside a callback, which runs before the widgets
-# are rebuilt on the next run.
-# ---------------------------------------------------------------
-all_skills = sorted(set(all_current_dfs) | set(prev_dfs))
-skills_key = tuple(all_skills)
+    # ---------------------------------------------------------------
+    # Selection state
+    #
+    # The checkbox keys ("chk_<skill>") ARE the state. Streamlit forbids writing
+    # a widget's key after the widget has been created, and ignores `value=` once
+    # the key exists -- which is why changing a separate dict did nothing. Every
+    # change therefore happens inside a callback, which runs before the widgets
+    # are rebuilt on the next run.
+    # ---------------------------------------------------------------
+    all_skills = sorted(set(all_current_dfs) | set(prev_dfs))
+    skills_key = tuple(all_skills)
 
-if st.session_state.get("_skills_key") != skills_key:
-    for _k in [k for k in st.session_state if k.startswith("chk_")]:
-        del st.session_state[_k]
-    st.session_state._skills_key = skills_key
-    st.session_state.pop("scope_mode", None)
+    if st.session_state.get("_skills_key") != skills_key:
+        for _k in [k for k in st.session_state if k.startswith("chk_")]:
+            del st.session_state[_k]
+        st.session_state._skills_key = skills_key
+        st.session_state.pop("scope_mode", None)
 
-for _sk in all_skills:
-    st.session_state.setdefault(f"chk_{_sk}", True)
-
-
-def _set_all(value: bool) -> None:
-    for sk in all_skills:
-        st.session_state[f"chk_{sk}"] = value
+    for _sk in all_skills:
+        st.session_state.setdefault(f"chk_{_sk}", True)
 
 
-def _apply_scope() -> None:
-    """Tick exactly the skills the chosen scope covers.
-
-    The callback runs BEFORE the campaign/skill selectbox is created, so on
-    the run where the scope changes its key does not exist yet. Falling back
-    to the first option keeps it in step with what the selectbox will show.
-    """
-    modo = st.session_state.get("scope_mode", "Todo el Contact Center")
-    campanas = sorted({find_campaign(sk) for sk in all_skills} - {"Sin asignar"})
-
-    if modo == "Una campana":
-        camp = st.session_state.get("scope_camp")
-        if camp not in campanas:
-            camp = campanas[0] if campanas else None
-        objetivo = {sk for sk in all_skills if find_campaign(sk) == camp}
-    elif modo == "Una habilidad":
-        elegida = st.session_state.get("scope_skill")
-        if elegida not in all_skills:
-            elegida = sorted(all_skills)[0] if all_skills else None
-        objetivo = {elegida} if elegida else set()
-    else:
-        objetivo = set(all_skills)
-
-    for sk in all_skills:
-        st.session_state[f"chk_{sk}"] = sk in objetivo
+    def _set_all(value: bool) -> None:
+        for sk in all_skills:
+            st.session_state[f"chk_{sk}"] = value
 
 
-_campanas = sorted({find_campaign(sk) for sk in all_skills} - {"Sin asignar"})
+    def _apply_scope() -> None:
+        """Tick exactly the skills the chosen scope covers.
 
-st.markdown("**Alcance**")
-_alcance = st.radio(
-    "Alcance del reporte", ["Todo el Contact Center", "Una campana", "Una habilidad"],
-    horizontal=True, key="scope_mode", on_change=_apply_scope,
-    label_visibility="collapsed",
-    help="Para armar un reporte enfocado, por ejemplo solo Turnos o solo la "
-         "habilidad PM Consultas.",
-)
+        The callback runs BEFORE the campaign/skill selectbox is created, so on
+        the run where the scope changes its key does not exist yet. Falling back
+        to the first option keeps it in step with what the selectbox will show.
+        """
+        modo = st.session_state.get("scope_mode", "Todo el Contact Center")
+        campanas = sorted({find_campaign(sk) for sk in all_skills} - {"Sin asignar"})
 
-_foco = None
-if _alcance == "Una campana" and _campanas:
-    _foco = st.selectbox("Campana", _campanas, key="scope_camp",
-                         on_change=_apply_scope)
-elif _alcance == "Una habilidad" and all_skills:
-    _foco = st.selectbox("Habilidad", sorted(all_skills), key="scope_skill",
-                         on_change=_apply_scope)
+        if modo == "Una campana":
+            camp = st.session_state.get("scope_camp")
+            if camp not in campanas:
+                camp = campanas[0] if campanas else None
+            objetivo = {sk for sk in all_skills if find_campaign(sk) == camp}
+        elif modo == "Una habilidad":
+            elegida = st.session_state.get("scope_skill")
+            if elegida not in all_skills:
+                elegida = sorted(all_skills)[0] if all_skills else None
+            objetivo = {elegida} if elegida else set()
+        else:
+            objetivo = set(all_skills)
 
-st.markdown("")
-col_all, col_none, col_info = st.columns([1, 1, 3])
-with col_all:
-    st.button("Seleccionar todas", use_container_width=True,
-              on_click=_set_all, args=(True,))
-with col_none:
-    st.button("Deseleccionar todas", use_container_width=True,
-              on_click=_set_all, args=(False,))
-with col_info:
-    n_selected = sum(1 for s in all_skills if st.session_state.get(f"chk_{s}"))
-    st.markdown(f"**{n_selected} de {len(all_skills)}** habilidades seleccionadas")
+        for sk in all_skills:
+            st.session_state[f"chk_{sk}"] = sk in objetivo
 
-if prev_dfs:
-    st.caption("Lo que destildes se excluye del reporte Y de la comparacion "
-               "con el mes anterior.")
 
-classification_all = {}
-for skill in all_skills:
-    classification_all.setdefault(find_campaign(skill), []).append(skill)
+    _campanas = sorted({find_campaign(sk) for sk in all_skills} - {"Sin asignar"})
 
-for camp_name in CAMPAIGN_ORDER + ["Camp HA", "Sin asignar"]:
-    if camp_name not in classification_all:
-        continue
-    ha_render(ha_chip(camp_name, muted=(camp_name == "Sin asignar")))
-    cols = st.columns(4)
-    for i, skill_name in enumerate(classification_all[camp_name]):
-        label = skill_name
-        if prev_dfs:
-            in_cur = skill_name in all_current_dfs
-            in_prev = skill_name in prev_dfs
-            if in_cur and not in_prev:
-                label = f"{skill_name}  (solo {current_period})"
-            elif in_prev and not in_cur:
-                label = f"{skill_name}  (solo {prev_period})"
-        with cols[i % 4]:
-            # No `value=`: the key alone holds the state.
-            st.checkbox(label, key=f"chk_{skill_name}")
+    st.markdown("**Alcance**")
+    _alcance = st.radio(
+        "Alcance del reporte", ["Todo el Contact Center", "Una campana", "Una habilidad"],
+        horizontal=True, key="scope_mode", on_change=_apply_scope,
+        label_visibility="collapsed",
+        help="Para armar un reporte enfocado, por ejemplo solo Turnos o solo la "
+             "habilidad PM Consultas.",
+    )
+
+    _foco = None
+    if _alcance == "Una campana" and _campanas:
+        _foco = st.selectbox("Campana", _campanas, key="scope_camp",
+                             on_change=_apply_scope)
+    elif _alcance == "Una habilidad" and all_skills:
+        _foco = st.selectbox("Habilidad", sorted(all_skills), key="scope_skill",
+                             on_change=_apply_scope)
+
+    st.markdown("")
+    col_all, col_none, col_info = st.columns([1, 1, 3])
+    with col_all:
+        st.button("Seleccionar todas", use_container_width=True,
+                  on_click=_set_all, args=(True,))
+    with col_none:
+        st.button("Deseleccionar todas", use_container_width=True,
+                  on_click=_set_all, args=(False,))
+    with col_info:
+        n_selected = sum(1 for s in all_skills if st.session_state.get(f"chk_{s}"))
+        st.markdown(f"**{n_selected} de {len(all_skills)}** habilidades seleccionadas")
+
+    if prev_dfs:
+        st.caption("Lo que destildes se excluye del reporte Y de la comparacion "
+                   "con el mes anterior.")
+
+    classification_all = {}
+    for skill in all_skills:
+        classification_all.setdefault(find_campaign(skill), []).append(skill)
+
+    for camp_name in CAMPAIGN_ORDER + ["Camp HA", "Sin asignar"]:
+        if camp_name not in classification_all:
+            continue
+        ha_render(ha_chip(camp_name, muted=(camp_name == "Sin asignar")))
+        cols = st.columns(4)
+        for i, skill_name in enumerate(classification_all[camp_name]):
+            label = skill_name
+            if prev_dfs:
+                in_cur = skill_name in all_current_dfs
+                in_prev = skill_name in prev_dfs
+                if in_cur and not in_prev:
+                    label = f"{skill_name}  (solo {current_period})"
+                elif in_prev and not in_cur:
+                    label = f"{skill_name}  (solo {prev_period})"
+            with cols[i % 4]:
+                # No `value=`: the key alone holds the state.
+                st.checkbox(label, key=f"chk_{skill_name}")
+
+    st.markdown("")
+    _b1, _b2, _b3 = st.columns([1, 2, 1])
+    with _b1:
+        if st.button("Volver", use_container_width=True):
+            _ir_a(1); st.rerun()
+    with _b3:
+        _sel_now = [k for k in all_skills if st.session_state.get(f"chk_{k}")]
+        if st.button("Continuar", type="primary", use_container_width=True,
+                     disabled=not _sel_now):
+            st.session_state["seleccion"] = _sel_now
+            st.session_state["foco"] = _foco
+            st.session_state.pop("reporte", None)
+            _ir_a(3); st.rerun()
+    if not [k for k in all_skills if st.session_state.get(f"chk_{k}")]:
+        st.info("Marca al menos una habilidad para continuar.")
+    st.stop()
+
+# From step 3 onwards the checkboxes are not on screen, so the stored list is
+# what defines the selection.
+_seleccion = st.session_state.get("seleccion", list(all_current_dfs))
+_foco = st.session_state.get("foco")
 
 # Apply the selection to BOTH months
-current_dfs = {s: df for s, df in all_current_dfs.items()
-               if st.session_state.get(f"chk_{s}")}
-prev_dfs = {s: df for s, df in prev_dfs.items()
-            if st.session_state.get(f"chk_{s}")}
+current_dfs = {s: df for s, df in all_current_dfs.items() if s in _seleccion}
+prev_dfs = {s: df for s, df in prev_dfs.items() if s in _seleccion}
 
 if not current_dfs:
-    st.warning("\u26a0\ufe0f No hay habilidades seleccionadas. Marc\u00e1 al menos una para generar el reporte.")
+    st.warning("No hay habilidades seleccionadas.")
+    if st.button("Volver a elegir"):
+        _ir_a(2); st.rerun()
     st.stop()
 
 # ======================================================================
@@ -327,99 +435,7 @@ for camp_name in CAMPAIGN_ORDER + ["Camp HA"]:
 skill_kpis = {n: compute_kpis(df, kpi_defs) for n, df in current_dfs.items()}
 
 # ======================================================================
-# Step 3: KPIs
-# ======================================================================
-ha_step(3, "Revisar los indicadores")
-
-if prev_dfs and (solo_mes_anterior or solo_mes_actual):
-    _msg = []
-    if solo_mes_anterior:
-        _msg.append(f"solo en {prev_period}: {', '.join(solo_mes_anterior)}")
-    if solo_mes_actual:
-        _msg.append(f"solo en {current_period}: {', '.join(solo_mes_actual)}")
-    st.info("Las habilidades no coinciden entre los dos meses (" + "; ".join(_msg) +
-            "). Se comparan igual: el total de lo seleccionado en cada mes. "
-            "Si no quer\u00e9s que una habilidad entre en la comparacion, "
-            "destildala en el paso 2.")
-
-
-def render_kpi_card(label, value, color=None, variation=None):
-    """Metric card. `color` is accepted for call compatibility and ignored:
-    the theme owns the palette so every card matches."""
-    var = ""
-    if variation and variation.get("formatted", "\u2014") != "\u2014":
-        var = variation["formatted"]
-    return ha_card(label, value, variation=var, accent=bool(var))
-
-st.markdown(f"#### Todas las campa\u00f1as seleccionadas \u2014 {current_period}"
-            + (f" vs {prev_period}" if prev_dfs else ""))
-
-# Row 1: 2 big cards
-cols_top = st.columns(2)
-with cols_top[0]:
-    ha_render(render_kpi_card("Recibidas", global_kpis["recibidas"]["formatted"],
-                                 "#1B3A5C", global_variations.get("recibidas")))
-with cols_top[1]:
-    ha_render(render_kpi_card("Atendidas", global_kpis["atendidas"]["formatted"],
-                                 "#5B9BD5", global_variations.get("atendidas")))
-
-# Row 2: 3 cards
-cols_bot = st.columns(3)
-with cols_bot[0]:
-    ha_render(render_kpi_card("Prom. Diario Recibidas",
-                                 global_kpis["promedio_recibidas"]["formatted"],
-                                 "#7F8C8D"))
-with cols_bot[1]:
-    ha_render(render_kpi_card("Prom. Diario Atendidas",
-                                 global_kpis["promedio_atendidas"]["formatted"],
-                                 "#7F8C8D"))
-with cols_bot[2]:
-    ha_render(render_kpi_card("Nivel de Atenci\u00f3n",
-                                 global_kpis["nivel_atencion"]["formatted"],
-                                 "#4CAF50", global_variations.get("nivel_atencion")))
-
-# Time cards
-st.markdown("")
-time_cols = st.columns(3)
-for col, kid, lab in zip(time_cols,
-    ["tiempo_conversacion", "tiempo_demora", "tiempo_abandono"],
-    ["Conversaci\u00f3n", "Demora", "Abandono"]):
-    with col:
-        ha_render(render_kpi_card(lab, global_kpis[kid]["formatted"], "#1B3A5C"))
-
-# Campaign KPIs
-with st.expander("KPIs por campa\u00f1a" + (" (con variaciones)" if prev_dfs else ""), expanded=True):
-    for camp_name in CAMPAIGN_ORDER + ["Camp HA"]:
-        if camp_name not in campaign_kpis:
-            continue
-        ck = campaign_kpis[camp_name]
-        cv = campaign_variations.get(camp_name, {})
-        parts = [f"**{camp_name}** \u2014"]
-        for kid, lab in [("recibidas", "Rec"), ("atendidas", "At"), ("nivel_atencion", "NA")]:
-            val = ck[kid]["formatted"]
-            vr = cv.get(kid, {}).get("formatted", "")
-            arrow = ""
-            if vr and "\u25b2" in vr: arrow = ""
-            elif vr and "\u25bc" in vr: arrow = ""
-            parts.append(f"{lab}: **{val}**{' ' + arrow + ' ' + vr if vr else ''}")
-        st.markdown(" \u00b7 ".join(parts))
-
-with st.expander("Detalle por habilidad", expanded=False):
-    rows = []
-    for name in sorted(current_dfs.keys(), key=lambda n: -skill_kpis[n]["recibidas"]["value"]):
-        sk = skill_kpis[name]
-        rows.append({
-            "Habilidad": name, "Campa\u00f1a": find_campaign(name),
-            "Recibidas": sk["recibidas"]["formatted"],
-            "Atendidas": sk["atendidas"]["formatted"],
-            "NA": sk["nivel_atencion"]["formatted"],
-            "Prom Diario Rec": sk["promedio_recibidas"]["formatted"],
-            "Prom Diario At": sk["promedio_atendidas"]["formatted"],
-        })
-    ha_table(rows)
-
-# ======================================================================
-# Aggregate helpers
+# Helpers shared by steps 3 and 4
 # ======================================================================
 def aggregate_daily(df):
     """Aggregate daily rows: sum Recibidas + Atendidas by date, recompute NA."""
@@ -449,10 +465,119 @@ def build_annex_rows(daily_df):
     return rows
 
 
+
+# ======================================================================
+# Step 3: KPIs
+# ======================================================================
+if _paso == 3:
+
+    if prev_dfs and (solo_mes_anterior or solo_mes_actual):
+        _msg = []
+        if solo_mes_anterior:
+            _msg.append(f"solo en {prev_period}: {', '.join(solo_mes_anterior)}")
+        if solo_mes_actual:
+            _msg.append(f"solo en {current_period}: {', '.join(solo_mes_actual)}")
+        st.info("Las habilidades no coinciden entre los dos meses (" + "; ".join(_msg) +
+                "). Se comparan igual: el total de lo seleccionado en cada mes. "
+                "Si no quer\u00e9s que una habilidad entre en la comparacion, "
+                "destildala en el paso 2.")
+
+
+    def render_kpi_card(label, value, color=None, variation=None):
+        """Metric card. `color` is accepted for call compatibility and ignored:
+        the theme owns the palette so every card matches."""
+        var = ""
+        if variation and variation.get("formatted", "\u2014") != "\u2014":
+            var = variation["formatted"]
+        return ha_card(label, value, variation=var, accent=bool(var))
+
+    st.markdown(f"#### Todas las campa\u00f1as seleccionadas \u2014 {current_period}"
+                + (f" vs {prev_period}" if prev_dfs else ""))
+
+    # Row 1: 2 big cards
+    cols_top = st.columns(2)
+    with cols_top[0]:
+        ha_render(render_kpi_card("Recibidas", global_kpis["recibidas"]["formatted"],
+                                     "#1B3A5C", global_variations.get("recibidas")))
+    with cols_top[1]:
+        ha_render(render_kpi_card("Atendidas", global_kpis["atendidas"]["formatted"],
+                                     "#5B9BD5", global_variations.get("atendidas")))
+
+    # Row 2: 3 cards
+    cols_bot = st.columns(3)
+    with cols_bot[0]:
+        ha_render(render_kpi_card("Prom. Diario Recibidas",
+                                     global_kpis["promedio_recibidas"]["formatted"],
+                                     "#7F8C8D"))
+    with cols_bot[1]:
+        ha_render(render_kpi_card("Prom. Diario Atendidas",
+                                     global_kpis["promedio_atendidas"]["formatted"],
+                                     "#7F8C8D"))
+    with cols_bot[2]:
+        ha_render(render_kpi_card("Nivel de Atenci\u00f3n",
+                                     global_kpis["nivel_atencion"]["formatted"],
+                                     "#4CAF50", global_variations.get("nivel_atencion")))
+
+    # Time cards
+    st.markdown("")
+    time_cols = st.columns(3)
+    for col, kid, lab in zip(time_cols,
+        ["tiempo_conversacion", "tiempo_demora", "tiempo_abandono"],
+        ["Conversaci\u00f3n", "Demora", "Abandono"]):
+        with col:
+            ha_render(render_kpi_card(lab, global_kpis[kid]["formatted"], "#1B3A5C"))
+
+    # Campaign KPIs
+    with st.expander("KPIs por campa\u00f1a" + (" (con variaciones)" if prev_dfs else ""), expanded=True):
+        for camp_name in CAMPAIGN_ORDER + ["Camp HA"]:
+            if camp_name not in campaign_kpis:
+                continue
+            ck = campaign_kpis[camp_name]
+            cv = campaign_variations.get(camp_name, {})
+            parts = [f"**{camp_name}** \u2014"]
+            for kid, lab in [("recibidas", "Rec"), ("atendidas", "At"), ("nivel_atencion", "NA")]:
+                val = ck[kid]["formatted"]
+                vr = cv.get(kid, {}).get("formatted", "")
+                arrow = ""
+                if vr and "\u25b2" in vr: arrow = ""
+                elif vr and "\u25bc" in vr: arrow = ""
+                parts.append(f"{lab}: **{val}**{' ' + arrow + ' ' + vr if vr else ''}")
+            st.markdown(" \u00b7 ".join(parts))
+
+    with st.expander("Detalle por habilidad", expanded=False):
+        rows = []
+        for name in sorted(current_dfs.keys(), key=lambda n: -skill_kpis[n]["recibidas"]["value"]):
+            sk = skill_kpis[name]
+            rows.append({
+                "Habilidad": name, "Campa\u00f1a": find_campaign(name),
+                "Recibidas": sk["recibidas"]["formatted"],
+                "Atendidas": sk["atendidas"]["formatted"],
+                "NA": sk["nivel_atencion"]["formatted"],
+                "Prom Diario Rec": sk["promedio_recibidas"]["formatted"],
+                "Prom Diario At": sk["promedio_atendidas"]["formatted"],
+            })
+        ha_table(rows)
+
+    # ======================================================================
+    # Aggregate helpers
+    # ======================================================================
+    st.markdown("")
+    _b1, _b2, _b3 = st.columns([1, 2, 1])
+    with _b1:
+        if st.button("Volver", use_container_width=True):
+            _ir_a(2); st.rerun()
+    with _b3:
+        if st.button("Continuar", type="primary", use_container_width=True):
+            _ir_a(4); st.rerun()
+    st.stop()
+
 # ======================================================================
 # Step 4: Charts
 # ======================================================================
-ha_step(4, "Generar y descargar el reporte")
+_nb1, _nb2 = st.columns([1, 4])
+with _nb1:
+    if st.button("Volver", use_container_width=True):
+        _ir_a(3); st.rerun()
 
 chart_dir = Path(tempfile.mkdtemp())
 chart_images = {}
@@ -643,7 +768,8 @@ if outbound_file is not None:
         if ob_agg["by_result"]:
             results = list(ob_agg["by_result"].keys())
             counts = list(ob_agg["by_result"].values())
-            fig = chart_vertical_bars(results, counts, title="Distribuci\u00f3n por resultado")
+            fig = chart_outbound_results(results, counts,
+                                          title="Distribuci\u00f3n por resultado")
             chart_images["outbound_result"] = str(save_chart(fig, chart_dir / "ob_result.png"))
             plt.close(fig)
 
@@ -654,40 +780,14 @@ if outbound_file is not None:
                            7:"jul",8:"ago",9:"sep",10:"oct",11:"nov",12:"dic"}
             labels = [f"{pd.Timestamp(d).day}-{month_names.get(pd.Timestamp(d).month,'?')}"
                       for d in daily_ob["date"]]
-            fig = chart_vertical_bars(labels, daily_ob["count"].tolist(),
-                                      title="Distribuci\u00f3n diaria \u2014 Llamadas salientes")
+            fig = chart_outbound_daily(labels, daily_ob["count"].tolist(),
+                                       title="Distribuci\u00f3n diaria \u2014 Llamadas salientes")
             chart_images["outbound_daily"] = str(save_chart(fig, chart_dir / "ob_daily.png"))
             plt.close(fig)
 
         st.success(f"Llamadas salientes cargadas: {ob_agg['total']:,} llamadas".replace(",", "."))
     except Exception as e:
         st.error(f"Error al procesar llamadas salientes: {e}")
-
-# ---- Consultas sobre los datos ----
-from app.ai_engine.query_engine import answer_question
-
-with st.expander("Consultar los datos", expanded=False):
-    st.caption("Pregunt\u00e1 en lenguaje natural. Por ejemplo: "
-               "*cu\u00e1ntas llamadas atendidas el 15 de junio en Turnos PM Estudios*")
-
-    pregunta = st.text_input("Tu pregunta", key="qa_input",
-                             placeholder="cu\u00e1ntas atendidas el 15 de junio en Turnos PM Estudios")
-
-    if pregunta:
-        _campaign_map = {c: [x["skill"] for x in v] for c, v in classification.items()}
-        res = answer_question(pregunta, current_dfs, _campaign_map)
-        if res.understood:
-            st.success(res.answer)
-            if res.detail is not None and len(res.detail) > 1:
-                with st.expander("Ver detalle diario"):
-                    ha_table(res.detail, max_height=320)
-        else:
-            st.warning(res.answer)
-            if res.suggestion:
-                st.caption(res.suggestion)
-
-    st.caption("Las respuestas se calculan directamente sobre los CSVs cargados: "
-               "son exactas y no se env\u00eda ning\u00fan dato fuera de la aplicaci\u00f3n.")
 
 # ---- Resumen ejecutivo y conclusiones ----
 # Built from the report's own figures: free, instant, nothing leaves the app
@@ -824,40 +924,61 @@ if generate_btn:
             skills_reference=skills_ref,
         )
 
-    _que = f"{_foco} \u00b7 " if _foco else ""
-    st.success(f"Reporte generado \u00b7 {_que}{len(pptx_campaigns)} secci\u00f3n(es), "
-               f"{len(annexes)} anexo(s)")
+    # A download_button reruns the script, and st.button() is False on that
+    # run, so anything rendered inside "if generate_btn" would vanish and the
+    # report had to be generated again. Storing the result keeps all three
+    # downloads available until a new report is generated.
     slug = current_period.replace(" ", "_")
     if _foco:
         _clean = "".join(ch if ch.isalnum() else "_" for ch in _foco).strip("_")
         slug = f"{_clean}_{slug}"
-    col_pptx, col_pdf = st.columns(2)
-    with col_pptx:
-        st.download_button(
-            label="Descargar PPTX",
-            data=pptx_bytes,
-            file_name=f"Reporte_CCenter_{slug}.pptx",
-            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-            type="primary", use_container_width=True,
-        )
-    with col_pdf:
-        st.download_button(
-            label="Descargar PDF",
-            data=pdf_bytes,
-            file_name=f"Reporte_CCenter_{slug}.pdf",
-            mime="application/pdf",
-            use_container_width=True,
-        )
 
-    # The updated history: this month is already in it. The team saves it in
-    # the shared folder, replacing the previous copy.
-    _hist_csv = export_history_csv()
+    st.session_state["reporte"] = {
+        "pptx": pptx_bytes,
+        "pdf": pdf_bytes,
+        "historico": export_history_csv().encode("utf-8-sig"),
+        "slug": slug,
+        "periodo": current_period,
+        "foco": _foco,
+        "secciones": len(pptx_campaigns),
+        "anexos": len(annexes),
+    }
+
+# ---- Descargas ----
+# Rendered outside the generate block, from the stored result.
+_rep = st.session_state.get("reporte")
+if _rep:
+    _que = f"{_rep['foco']} \u00b7 " if _rep.get("foco") else ""
+    st.success(f"Reporte de {_rep['periodo']} listo \u00b7 {_que}"
+               f"{_rep['secciones']} secci\u00f3n(es), {_rep['anexos']} anexo(s)")
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.download_button(
+            "Descargar PPTX", data=_rep["pptx"],
+            file_name=f"Reporte_CCenter_{_rep['slug']}.pptx",
+            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            type="primary", use_container_width=True, key="dl_pptx")
+    with c2:
+        st.download_button(
+            "Descargar PDF", data=_rep["pdf"],
+            file_name=f"Reporte_CCenter_{_rep['slug']}.pdf",
+            mime="application/pdf", use_container_width=True, key="dl_pdf")
+
     st.download_button(
-        label="Descargar hist\u00f3rico actualizado",
-        data=_hist_csv.encode("utf-8-sig"),
-        file_name="historico_contact_center.csv",
-        mime="text/csv",
-        use_container_width=True,
-    )
-    st.caption("Guardalo en la carpeta compartida pisando el anterior. "
-               "El mes que acabas de generar ya esta incluido.")
+        "Descargar hist\u00f3rico actualizado", data=_rep["historico"],
+        file_name="historico_contact_center.csv", mime="text/csv",
+        use_container_width=True, key="dl_hist")
+    st.caption("Los tres archivos siguen disponibles: pod\u00e9s bajarlos en "
+               "cualquier orden sin volver a generar el reporte. "
+               "Guard\u00e1 el hist\u00f3rico en la carpeta compartida pisando el anterior.")
+
+    st.markdown("")
+    if st.button("Hacer otro reporte", use_container_width=True):
+        for _k in ("archivos", "seleccion", "reporte", "current", "previous",
+                   "outbound", "history", "_skills_key"):
+            st.session_state.pop(_k, None)
+        for _k in [k for k in list(st.session_state) if k.startswith("chk_")]:
+            del st.session_state[_k]
+        _ir_a(1)
+        st.rerun()

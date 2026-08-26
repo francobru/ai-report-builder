@@ -402,3 +402,89 @@ def _date_labels(df: pd.DataFrame, date_col: str) -> list[str]:
             d = pd.Timestamp(dt)
             labels.append(f"{d.day}-{month_names.get(d.month, '?')}")
     return labels
+
+
+# ======================================================================
+# Outbound calls (llamadas salientes)
+# ======================================================================
+# Both charts used to share one row, so each was squeezed into ~6 inches and
+# its labels ended up around 4 pt on the slide. They now take the full slide
+# width, stacked, and are generated at the proportion of the box they land in
+# so nothing is scaled down.
+
+def chart_outbound_results(
+    labels: Sequence[str],
+    values: Sequence[float],
+    title: str = "Distribucion por resultado",
+    *,
+    figsize: tuple[float, float] = (16.0, 2.55),
+) -> plt.Figure:
+    """Horizontal bars: reason labels read straight, no rotation."""
+    order = np.argsort(values)              # largest on top after inverting
+    labels = [labels[i] for i in order]
+    values = [values[i] for i in order]
+    y = np.arange(len(labels))
+    total = sum(values) or 1
+
+    fig, ax = plt.subplots(figsize=figsize)
+    colors = [DARK_NAVY if v >= max(values) * 0.5 else MEDIUM_BLUE for v in values]
+    bars = ax.barh(y, values, height=0.62, color=colors, zorder=3)
+
+    ax.set_yticks(y)
+    ax.set_yticklabels(labels, fontsize=15)
+    ax.xaxis.set_major_formatter(mticker.FuncFormatter(_format_thousands))
+    ax.tick_params(axis="x", labelsize=13)
+
+    span = max(values) if len(values) else 1
+    for bar, v in zip(bars, values):
+        ax.text(bar.get_width() + span * 0.012,
+                bar.get_y() + bar.get_height() / 2,
+                _fmt_int(v) + "  (" + f"{v / total * 100:.1f}".replace(".", ",") + "%)",
+                va="center", fontsize=14, fontweight="bold")
+
+    ax.set_xlim(0, span * 1.16)
+    ax.set_title(title, fontsize=18, fontweight="bold", loc="left", pad=12)
+    ax.xaxis.grid(True, alpha=0.25, linewidth=0.6, zorder=0)
+    ax.set_axisbelow(True)
+    fig.tight_layout()
+    return fig
+
+
+def chart_outbound_daily(
+    labels: Sequence[str],
+    values: Sequence[float],
+    title: str = "Distribucion diaria - Llamadas salientes",
+    *,
+    figsize: tuple[float, float] = (16.0, 2.95),
+) -> plt.Figure:
+    """Daily volume across the full slide width.
+
+    With many days the value labels are thinned out (every other bar) instead
+    of shrinking the font until nothing can be read.
+    """
+    n = len(labels)
+    x = np.arange(n)
+    fig, ax = plt.subplots(figsize=figsize)
+    bars = ax.bar(x, values, width=0.62, color=DARK_NAVY, zorder=3)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, rotation=90 if n > 20 else 45,
+                       ha="center" if n > 20 else "right", fontsize=12)
+    ax.yaxis.set_major_formatter(mticker.FuncFormatter(_format_thousands))
+    ax.tick_params(axis="y", labelsize=12)
+
+    paso = 1 if n <= 16 else 2              # label every other bar when crowded
+    for i, bar in enumerate(bars):
+        if i % paso:
+            continue
+        h = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width() / 2, h, _fmt_int(h),
+                ha="center", va="bottom", fontsize=11, fontweight="bold")
+
+    ax.set_ylim(0, max(values) * 1.16 if len(values) else 1)
+    ax.set_title(title, fontsize=18, fontweight="bold", loc="left", pad=12)
+    ax.yaxis.grid(True, alpha=0.25, linewidth=0.6, zorder=0)
+    ax.set_axisbelow(True)
+    ax.margins(x=0.01)
+    fig.tight_layout()
+    return fig
