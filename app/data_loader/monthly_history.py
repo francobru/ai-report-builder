@@ -148,7 +148,7 @@ def export_history_csv(year: int | None = None) -> str:
 
 def _parse_number(text: str) -> float | None:
     """Read a number written the Argentine way ('79.134' or '92,3')."""
-    txt = str(text).strip().replace(" ", "")
+    txt = str(text).strip().strip('"').strip("'").replace(" ", "").replace("\xa0", "")
     if not txt:
         return None
     if "," in txt:                     # comma is the decimal mark
@@ -178,11 +178,18 @@ def import_history_csv(text: str) -> tuple[int, list[str]]:
         line = raw.strip()
         if not line:
             continue
-        parts = [p.strip() for p in line.split(";")]
+        # Excel quotes fields when it re-saves a CSV, and may use ";", "," or
+        # a tab depending on the machine's locale. Try each and unquote.
+        parts = []
+        for sep in (";", "\t", ","):
+            candidate = [c.strip().strip('"').strip("'").strip()
+                         for c in line.split(sep)]
+            if len(candidate) >= 5:
+                parts = candidate
+                break
         if len(parts) < 5:
-            parts = [p.strip() for p in line.split(",")]
-        if len(parts) < 5:
-            warnings.append(f"Linea {i}: se esperaban 5 columnas.")
+            warnings.append(f"Linea {i}: se esperaban 5 columnas, "
+                            f"encontre {max(1, len(parts))}.")
             continue
         if parts[0].lower().startswith("anio") or parts[0].lower().startswith("ano"):
             continue                                    # header
@@ -208,6 +215,10 @@ def import_history_csv(text: str) -> tuple[int, list[str]]:
 
     if imported:
         _save_history(records)
+    elif text.strip():
+        warnings.insert(0, "No pude leer ninguna fila del archivo de historico. "
+                           "Revisa que tenga las columnas Anio;Mes;Recibidas;"
+                           "Atendidas;Nivel de Atencion.")
     return imported, warnings
 
 

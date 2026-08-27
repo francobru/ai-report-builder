@@ -68,7 +68,7 @@ masthead("Productividad del Contact Center",
 _scope_label = None
 
 # Version banner \u2014 lets you confirm at a glance which version is deployed
-APP_VERSION = "4.0.1"
+APP_VERSION = "4.0.2"
 st.caption(f"Versi\u00f3n {APP_VERSION} \u00b7 Contact Center y Plan M\u00e9dico \u00b7 hist\u00f3rico en archivo")
 
 with st.sidebar:
@@ -704,13 +704,16 @@ from app.data_loader.monthly_history import (get_trend, add_month,
 
 # Load the uploaded history first, so the trend is complete before the
 # current month is added to it.
-if _historico_cache is not None and not _arch.get("historico_aplicado"):
+# Re-imported on every run rather than once: the server can restart and wipe
+# the stored file at any moment, and a one-shot import would leave the trend
+# silently incomplete. Importing again is cheap and idempotent.
+if _historico_cache is not None:
     try:
         _n, _warn = import_history_csv(
             _historico_cache.decode("utf-8-sig", errors="replace"))
-        _arch["historico_aplicado"] = True
-        if _n:
+        if _n and not _arch.get("historico_avisado"):
             st.success(f"Hist\u00f3rico cargado: {_n} mes(es).")
+            _arch["historico_avisado"] = True
         for _w in _warn:
             st.warning(_w)
     except Exception as _e:
