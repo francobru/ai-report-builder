@@ -144,7 +144,13 @@ def extract_skill_name(filename: str) -> str:
     if name.lower().endswith(".csv"):
         name = name[:-4]
 
-    # Remove month-year suffix
+    # Windows adds " (1)" to duplicate downloads; drop it before anything else
+    name = re.sub(r"\s*\(\d+\)\s*$", "", name)
+
+    # Remove month-year suffix. Applied twice so "PM Consultas_jul26 copia"
+    # style leftovers still resolve once the trailing word is gone.
+    name = _MONTH_PATTERN.sub("", name)
+    name = re.sub(r"[_ -]+(copia|copy|final|v\d+)$", "", name, flags=re.IGNORECASE)
     name = _MONTH_PATTERN.sub("", name)
 
     # Replace underscores with spaces and clean up

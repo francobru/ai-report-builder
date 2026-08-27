@@ -68,7 +68,7 @@ masthead("Productividad del Contact Center",
 _scope_label = None
 
 # Version banner \u2014 lets you confirm at a glance which version is deployed
-APP_VERSION = "4.0"
+APP_VERSION = "4.0.1"
 st.caption(f"Versi\u00f3n {APP_VERSION} \u00b7 Contact Center y Plan M\u00e9dico \u00b7 hist\u00f3rico en archivo")
 
 with st.sidebar:
@@ -203,10 +203,26 @@ if "archivos" not in st.session_state:
         _cur_dfs, _cur_per = load_file_set(current_files)
         _prev_dfs, _prev_per = (({}, None) if not previous_files
                                 else load_file_set(previous_files))
+    # The uploaders live on step 1 only, so their CONTENT is cached too --
+    # otherwise the outbound and history files disappear on later steps and
+    # their report pages were silently skipped.
+    _ob = None
+    if outbound_file is not None:
+        outbound_file.seek(0)
+        _ob = {"nombre": outbound_file.name, "bytes": outbound_file.read()}
+    _hi = None
+    if history_file is not None:
+        history_file.seek(0)
+        _hi = history_file.read()
+
     st.session_state["archivos"] = {
         "current": _cur_dfs, "current_period": _cur_per,
         "prev": _prev_dfs, "prev_period": _prev_per,
         "nombres": [f.name for f in current_files],
+        "nombres_prev": [f.name for f in previous_files],
+        "outbound": _ob,
+        "historico": _hi,
+        "historico_aplicado": False,
     }
 
 _arch = st.session_state["archivos"]
@@ -214,6 +230,9 @@ all_current_dfs = _arch["current"]
 current_period = _arch["current_period"]
 prev_dfs = _arch["prev"]
 prev_period = _arch["prev_period"]
+_nombres_actual = _arch.get("nombres", [])
+_outbound_cache = _arch.get("outbound")
+_historico_cache = _arch.get("historico")
 
 if not all_current_dfs:
     st.error("No pude leer ninguna habilidad de los archivos cargados.")
@@ -315,6 +334,26 @@ if _paso == 2:
     if prev_dfs:
         st.caption("Lo que destildes se excluye del reporte Y de la comparacion "
                    "con el mes anterior.")
+
+    # When a skill shows up as "solo <mes>" the usual cause is that the two
+    # files produced different skill names. This makes that visible instead
+    # of leaving the user guessing.
+    _solo_uno = [sk for sk in all_skills
+                 if (sk in all_current_dfs) != (sk in prev_dfs)]
+    if prev_dfs and _solo_uno:
+        with st.expander(f"Por que {len(_solo_uno)} habilidad(es) figuran en un solo mes"):
+            st.caption("Nombre de archivo \u2192 habilidad detectada. Si el mismo "
+                       "dato aparece con dos nombres distintos, renombra uno de los "
+                       "archivos para que coincidan.")
+            _filas = []
+            for _n in _arch.get("nombres", []):
+                _filas.append({"Archivo": _n, "Mes": current_period,
+                               "Habilidad detectada": extract_skill_name(_n)})
+            for _n in _arch.get("nombres_prev", []):
+                _filas.append({"Archivo": _n, "Mes": prev_period or "anterior",
+                               "Habilidad detectada": extract_skill_name(_n)})
+            _filas.sort(key=lambda r: (r["Habilidad detectada"].lower(), r["Mes"]))
+            ha_table(_filas)
 
     classification_all = {}
     for skill in all_skills:
@@ -665,10 +704,11 @@ from app.data_loader.monthly_history import (get_trend, add_month,
 
 # Load the uploaded history first, so the trend is complete before the
 # current month is added to it.
-if history_file is not None:
+if _historico_cache is not None and not _arch.get("historico_aplicado"):
     try:
-        _raw = history_file.read(); history_file.seek(0)
-        _n, _warn = import_history_csv(_raw.decode("utf-8-sig", errors="replace"))
+        _n, _warn = import_history_csv(
+            _historico_cache.decode("utf-8-sig", errors="replace"))
+        _arch["historico_aplicado"] = True
         if _n:
             st.success(f"Hist\u00f3rico cargado: {_n} mes(es).")
         for _w in _warn:
@@ -679,8 +719,8 @@ from app.data_loader.skill_mapper import extract_period as _extract_period_full
 
 # Determine current month/year from the period label
 _period_info = None
-for uf in current_files:
-    _period_info = _extract_period_full(uf.name)
+for _nombre in _nombres_actual:
+    _period_info = _extract_period_full(_nombre)
     if _period_info:
         break
 
@@ -747,14 +787,13 @@ if _period_info:
 
 # ---- Outbound calls (llamadas salientes) ----
 outbound_data = None
-if outbound_file is not None:
+if _outbound_cache is not None:
     from app.data_loader.outbound_loader import (
         load_outbound_csv, aggregate_outbound, count_rotaciones_am,
     )
     try:
-        content = outbound_file.read(); outbound_file.seek(0)
         tmp = tempfile.NamedTemporaryFile(suffix=".csv", delete=False)
-        tmp.write(content); tmp.close()
+        tmp.write(_outbound_cache["bytes"]); tmp.close()
         ob_df = load_outbound_csv(Path(tmp.name))
         ob_agg = aggregate_outbound(ob_df)
 
