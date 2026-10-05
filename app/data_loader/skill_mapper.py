@@ -58,6 +58,7 @@ _MONTH_MAP = {
 CAMPAIGN_MAPPING: dict[str, list[str]] = {
     "Turnos": [
         "Turnos Estudios",
+        "Tur Est Conting",
         "Turnos PM Estudios",
         "Turno Consulta",
         "Turnos PM Consulta",
@@ -107,7 +108,12 @@ for _camp, _skills in CAMPAIGN_MAPPING.items():
 GIPFEL_SKILLS = {"gipfel cober", "gipfel pm"}
 
 # Campaign display order (as in the report)
-CAMPAIGN_ORDER = ["Conmutador", "Plan M\u00e9dico", "Portal", "Turnos", "Agendas"]
+CAMPAIGN_ORDER = ["Conmutador", "Plan M\u00e9dico", "Portal", "Turnos"]
+
+# Campaigns kept out of the report: their skills are recognised (so they are
+# not flagged as unassigned) but they get no slides, charts or annexes, and
+# they do not count towards the totals.
+CAMPANAS_EXCLUIDAS = {"Agendas"}
 
 
 # ======================================================================

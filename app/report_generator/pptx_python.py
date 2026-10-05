@@ -98,6 +98,20 @@ def _add_header_bar(slide, title_text, subtitle_text, period):
                      alignment=PP_ALIGN.RIGHT)
 
 
+def _numerar_paginas(prs, period):
+    """Write the footer on every slide once the deck is complete.
+
+    Page numbers used to be passed in while building, with several builders
+    hardcoding a total of 19 and the computed total ignoring the optional
+    pages. Numbering at the end makes "Pagina X de Y" correct by construction.
+    """
+    total = len(prs.slides._sldIdLst)
+    for i, slide in enumerate(prs.slides, start=1):
+        if i == 1:
+            continue                      # the cover carries no footer
+        _add_footer(slide, i, total)
+
+
 def _add_footer(slide, page_num, total_pages):
     """Add footer line with source and page number."""
     _add_rect(slide, Inches(0.5), Inches(6.9), Inches(12.3), Pt(1),
@@ -283,7 +297,6 @@ def _build_general_data(prs, period, kpis, variations):
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     subtitle = f"Productividad del Contact Center \u00b7 {period}"
     _add_header_bar(slide, "Datos Generales", subtitle, period)
-    _add_footer(slide, 2, 19)
     _add_section_title(slide, "Indicadores principales del mes", 0.9)
 
     _add_textbox(slide, Inches(0.7), Inches(1.35), Inches(12), Inches(0.3),
@@ -332,7 +345,6 @@ def _build_campaign_slide(prs, name, kpis, variations, chart_path,
     subtitle = f"Productividad del Contact Center \u00b7 {period}"
     title = name if is_all else f"Campa\u00f1a: {name}"
     _add_header_bar(slide, title, subtitle, period)
-    _add_footer(slide, page_num, 19)
     _add_section_title(slide, "Indicadores y distribuci\u00f3n diaria", 0.85)
 
     cardW, gap, startX = 2.3, 0.15, 0.5
@@ -365,7 +377,6 @@ def _build_chart_slide(prs, title, section, chart_path, page_num, period):
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     subtitle = f"Productividad del Contact Center \u00b7 {period}"
     _add_header_bar(slide, title, subtitle, period)
-    _add_footer(slide, page_num, 19)
     _add_section_title(slide, section, 0.9)
     if chart_path:
         _add_chart_image(slide, chart_path, 0.3, 1.4, 12.5, 5.2)
@@ -377,7 +388,6 @@ def _build_dual_chart_slide(prs, title, section, chart_left, chart_right,
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     subtitle = f"Productividad del Contact Center \u00b7 {period}"
     _add_header_bar(slide, title, subtitle, period)
-    _add_footer(slide, page_num, 19)
     _add_section_title(slide, section, 0.9)
     if chart_left:
         _add_chart_image(slide, chart_left, 0.2, 1.4, 6.5, 4.8)
@@ -396,7 +406,6 @@ def _build_skill_table_slide(prs, skill_table, page_num, period):
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     subtitle = f"Productividad del Contact Center \u00b7 {period}"
     _add_header_bar(slide, "An\u00e1lisis de Habilidades", subtitle, period)
-    _add_footer(slide, page_num, 19)
     _add_section_title(slide, "Detalle por habilidad \u2014 volumen, atenci\u00f3n y tiempos promedio", 0.9)
 
     if not skill_table:
@@ -512,7 +521,6 @@ def _build_annex_daily_table(prs, campaign_name, daily_rows, page_num, total_pag
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     subtitle = f"Productividad del Contact Center \u00b7 {period}"
     _add_header_bar(slide, f"Anexo \u2014 {campaign_name}", subtitle, period)
-    _add_footer(slide, page_num, total_pages)
     _add_section_title(slide, f"Productividad diaria \u2014 {campaign_name}", 0.9)
 
     if not daily_rows:
@@ -602,32 +610,28 @@ def _build_outbound_slide(prs, outbound, chart_images, page_num, total_pages, pe
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     subtitle = f"Productividad del Contact Center \u00b7 {period}"
     _add_header_bar(slide, "Llamadas Salientes", subtitle, period)
-    _add_footer(slide, page_num, total_pages)
     _add_section_title(slide, "Resumen de gesti\u00f3n de llamadas salientes", 0.9)
 
-    # KPI cards. Rotaciones AM and Solo Operadores AM are left BLANK on purpose:
-    # those figures come from the supervisors' cancellation registry, so the
-    # user fills them in manually in PowerPoint.
+    # Two cards now that "Solo Operadores AM" is no longer tracked. They are
+    # wider and centred so the row does not look like one is missing.
     total = outbound.get("total", 0)
 
     def _fmt(n):
         return f"{int(n):,}".replace(",", ".")
 
-    _add_kpi_card(slide, 0.5, 1.4, 3.8, "Total Llamadas Salientes", _fmt(total), None, DARK_NAVY)
-    _add_kpi_card(slide, 4.6, 1.4, 3.8, "Rotaciones AM", "", None, MEDIUM_BLUE)
-    _add_kpi_card(slide, 8.7, 1.4, 3.8, "Solo Operadores AM", "", None, GREEN)
-
-    # Hint that these two are filled manually
-    _add_textbox(slide, 4.6 * 914400, int(2.42 * 914400), int(7.9 * 914400), int(0.25 * 914400),
-                 "Completar manualmente \u2014 fuente: registro de cancelaciones de supervisores",
+    cw, gap = 5.6, 0.5
+    x0 = (13.333 - (cw * 2 + gap)) / 2
+    _add_kpi_card(slide, x0, 1.32, cw, "Total Llamadas Salientes", _fmt(total),
+                  None, DARK_NAVY, h=0.95, value_size=24)
+    _add_kpi_card(slide, x0 + cw + gap, 1.32, cw, "Rotaciones AM", "",
+                  None, MEDIUM_BLUE, h=0.95, value_size=24)
+    _add_textbox(slide, Inches(x0 + cw + gap), Inches(2.33), Inches(cw), Inches(0.25),
+                 "Completar manualmente \u2014 registro de cancelaciones de supervisores",
                  font_size=8, italic=True, color=TEXT_GRAY, alignment=PP_ALIGN.CENTER)
 
-    # Stacked full width: side by side left each chart at ~6 inches, which
-    # shrank the labels to around 4 pt on the slide.
-    if chart_images.get("outbound_result"):
-        _add_chart_image(slide, chart_images["outbound_result"], 0.35, 2.50, 12.6, 2.01)
+    _add_chart_image(slide, chart_images.get("outbound_result"), 0.35, 2.50, 12.6, 2.01)
     if chart_images.get("outbound_daily"):
-        _add_chart_image(slide, chart_images["outbound_daily"], 0.35, 4.56, 12.6, 2.32)
+        _add_chart_image(slide, chart_images.get("outbound_daily"), 0.35, 4.56, 12.6, 2.32)
 
 
 def _build_monthly_trend_slide(prs, trend_records, chart_path, page_num, total_pages, period):
@@ -635,7 +639,6 @@ def _build_monthly_trend_slide(prs, trend_records, chart_path, page_num, total_p
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     subtitle = f"Productividad del Contact Center \u00b7 {period}"
     _add_header_bar(slide, "Evoluci\u00f3n Mensual", subtitle, period)
-    _add_footer(slide, page_num, total_pages)
     _add_section_title(slide, "Tendencia mensual del a\u00f1o", 0.9)
 
     if not trend_records:
@@ -712,7 +715,6 @@ def _build_skills_reference_annex(prs, skills_reference, page_num, total_pages, 
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     subtitle = f"Productividad del Contact Center \u00b7 {period}"
     _add_header_bar(slide, "Anexo \u2014 Referencia de Habilidades", subtitle, period)
-    _add_footer(slide, page_num, total_pages)
     _add_section_title(slide, "Habilidades por campa\u00f1a", 0.9)
 
     if not skills_reference:
@@ -771,6 +773,31 @@ def _build_skills_reference_annex(prs, skills_reference, page_num, total_pages, 
                     p.alignment = PP_ALIGN.LEFT
 
 
+def _build_narrative_slide(prs, title, subtitle, body, period, accent=DARK_NAVY):
+    """A text slide: executive summary or conclusions."""
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_header_bar(slide, title, f"Productividad del Contact Center \u00b7 {period}", period)
+    _add_section_title(slide, subtitle, 0.9)
+
+    _add_rect(slide, Inches(0.6), Inches(1.45), Inches(12.1), Inches(5.0),
+              fill_color=LIGHT_GRAY)
+    _add_rect(slide, Inches(0.6), Inches(1.45), Inches(0.06), Inches(5.0),
+              fill_color=accent)
+
+    box = slide.shapes.add_textbox(Inches(0.95), Inches(1.75), Inches(11.5), Inches(4.4))
+    tf = box.text_frame
+    tf.word_wrap = True
+    lineas = [l for l in str(body).split("\n") if l.strip()]
+    for i, linea in enumerate(lineas):
+        p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+        p.text = linea.strip()
+        p.font.size = Pt(15)
+        p.font.name = FONT_NAME
+        p.font.color.rgb = TEXT_DARK
+        p.space_after = Pt(10)
+    return slide
+
+
 def generate_pptx_report(
     period: str,
     global_kpis: dict[str, str],
@@ -783,6 +810,8 @@ def generate_pptx_report(
     monthly_trend: list[dict[str, Any]] | None = None,
     donut_footnote: str | None = None,
     skills_reference: list[dict[str, str]] | None = None,
+    resumen: str | None = None,
+    conclusiones: str | None = None,
 ) -> bytes:
     """Generate a complete PPTX report and return it as bytes.
 
@@ -816,78 +845,69 @@ def generate_pptx_report(
 
     # Calculate total pages upfront
     annexes = annexes or []
-    total_pages = 4 + len(campaign_data) + 1 + len(annexes)  # cover+datos+weekday+campanalysis + N campaigns + skill_table + annexes
 
     # 1. Cover
     _build_cover(prs, period)
 
-    # 2. General Data
+    # 2. Executive summary, right after the cover: the reader gets the
+    #    headline before any detail.
+    if resumen:
+        _build_narrative_slide(prs, "Resumen Ejecutivo",
+                               f"S\u00edntesis del per\u00edodo \u2014 {period}",
+                               resumen, period, accent=DARK_NAVY)
+
+    # 3. General Data
     _build_general_data(prs, period, global_kpis, global_variations)
 
-    # 3. Weekday distribution
+    # 4. Weekday distribution
     _build_chart_slide(prs, "Distribuci\u00f3n por D\u00eda de Semana",
                        "Comportamiento por d\u00eda \u2014 todas las campa\u00f1as",
-                       chart_images.get("weekday_distribution"),
-                       3, period)
+                       chart_images.get("weekday_distribution"), 0, period)
 
-    # 4. Campaign analysis (dual charts)
+    # 5. Campaign analysis
     _build_dual_chart_slide(prs, "An\u00e1lisis de Campa\u00f1as",
                             "Volumen y participaci\u00f3n por campa\u00f1a",
                             chart_images.get("campaign_volume"),
                             chart_images.get("campaign_share"),
-                            4, period,
-                            footnote=donut_footnote)
+                            0, period, footnote=donut_footnote)
 
-    # 5+. Individual campaigns
-    for i, camp in enumerate(campaign_data):
-        _build_campaign_slide(
-            prs, camp["name"], camp["kpis"], camp.get("variations", {}),
-            camp.get("chart_path"), 5 + i, period
-        )
+    # 6+. One slide per campaign
+    for camp in campaign_data:
+        _build_campaign_slide(prs, camp["name"], camp["kpis"],
+                              camp.get("variations", {}), camp.get("chart_path"),
+                              0, period, is_all=camp.get("is_all", False))
 
-    page = 5 + len(campaign_data)
-
-    # Monthly trend (evoluci\u00f3n mensual)
     if monthly_trend:
         _build_monthly_trend_slide(prs, monthly_trend,
                                    chart_images.get("monthly_evolution"),
-                                   page, total_pages, period)
-        page += 1
+                                   0, 0, period)
 
-    # Outbound calls (llamadas salientes)
-    if outbound:
-        _build_outbound_slide(prs, outbound, chart_images, page, total_pages, period)
-        page += 1
+    if outbound and outbound.get("total"):
+        _build_outbound_slide(prs, outbound, chart_images, 0, 0, period)
 
-    # Top 10 skills chart
     if chart_images.get("skill_volume_top10"):
         _build_chart_slide(prs, "An\u00e1lisis de Habilidades \u2014 Top 10",
                            "Top 10 habilidades por volumen de llamadas",
-                           chart_images["skill_volume_top10"], page, period)
-        page += 1
+                           chart_images["skill_volume_top10"], 0, period)
 
-    # Skill detail table
-    _build_skill_table_slide(prs, skill_table, page, period)
-    skill_page = page
+    _build_skill_table_slide(prs, skill_table, 0, period)
 
-    # Annexes: one slide per campaign with daily table
-    for i, annex in enumerate(annexes):
-        _build_annex_daily_table(
-            prs,
-            annex["campaign_name"],
-            annex["daily_rows"],
-            skill_page + 1 + i,
-            total_pages,
-            period,
-        )
+    # Conclusions close the analysis, before the annexes.
+    if conclusiones:
+        _build_narrative_slide(prs, "Conclusiones",
+                               f"Lectura de los indicadores \u2014 {period}",
+                               conclusiones, period, accent=GREEN)
 
-    # Final annex: skill \u2192 campaign reference table
+    for annex in annexes:
+        _build_annex_daily_table(prs, annex["campaign_name"], annex["daily_rows"],
+                                 0, 0, period)
+
     if skills_reference:
-        _build_skills_reference_annex(prs, skills_reference,
-                                      skill_page + 1 + len(annexes),
-                                      total_pages, period)
+        _build_skills_reference_annex(prs, skills_reference, 0, 0, period)
 
-    # Save to bytes
+    # Page numbers last, when the real count is known.
+    _numerar_paginas(prs, period)
+
     buffer = io.BytesIO()
     prs.save(buffer)
     buffer.seek(0)

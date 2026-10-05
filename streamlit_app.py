@@ -22,6 +22,7 @@ from app.data_loader.validator import validate
 from app.data_loader.skill_mapper import (
     extract_skill_name, extract_period, find_campaign,
     classify_files, is_gipfel_skill, CAMPAIGN_ORDER, GIPFEL_SKILLS,
+    CAMPANAS_EXCLUIDAS,
 )
 from app.kpi_engine.calculator import compute_kpis, compute_variation
 from app.chart_engine.renderer import (
@@ -68,7 +69,7 @@ masthead("Productividad del Contact Center",
 _scope_label = None
 
 # Version banner \u2014 lets you confirm at a glance which version is deployed
-APP_VERSION = "4.0.2"
+APP_VERSION = "4.1"
 st.caption(f"Versi\u00f3n {APP_VERSION} \u00b7 Contact Center y Plan M\u00e9dico \u00b7 hist\u00f3rico en archivo")
 
 with st.sidebar:
@@ -226,6 +227,17 @@ if "archivos" not in st.session_state:
     }
 
 _arch = st.session_state["archivos"]
+
+# Skills of excluded campaigns (Agendas) never reach the report: no slides,
+# no charts and no effect on the totals.
+def _sin_excluidas(d):
+    return {k: v for k, v in d.items() if find_campaign(k) not in CAMPANAS_EXCLUIDAS}
+
+_descartadas = sorted({k for k in list(_arch["current"]) + list(_arch["prev"])
+                       if find_campaign(k) in CAMPANAS_EXCLUIDAS})
+_arch["current"] = _sin_excluidas(_arch["current"])
+_arch["prev"] = _sin_excluidas(_arch["prev"])
+
 all_current_dfs = _arch["current"]
 current_period = _arch["current_period"]
 prev_dfs = _arch["prev"]
@@ -331,6 +343,9 @@ if _paso == 2:
         n_selected = sum(1 for s in all_skills if st.session_state.get(f"chk_{s}"))
         st.markdown(f"**{n_selected} de {len(all_skills)}** habilidades seleccionadas")
 
+    if _descartadas:
+        st.caption("No entran al reporte (campa\u00f1a dada de baja): "
+                   + ", ".join(_descartadas))
     if prev_dfs:
         st.caption("Lo que destildes se excluye del reporte Y de la comparacion "
                    "con el mes anterior.")
@@ -413,11 +428,7 @@ if not current_dfs:
 # Compute
 # ======================================================================
 all_current = pd.concat([df.assign(_skill=n) for n, df in current_dfs.items()], ignore_index=True)
-no_gipfel_mask = ~all_current["_skill"].str.lower().isin(GIPFEL_SKILLS)
-all_no_gipfel = all_current[no_gipfel_mask]
-
 global_kpis = compute_kpis(all_current, kpi_defs)
-global_ng_kpis = compute_kpis(all_no_gipfel, kpi_defs) if len(all_no_gipfel) > 0 else None
 
 # Variations
 # The variation compares FULL month totals against FULL month totals, so it
@@ -425,7 +436,6 @@ global_ng_kpis = compute_kpis(all_no_gipfel, kpi_defs) if len(all_no_gipfel) > 0
 # only the skills common to both months made the percentage disagree with a
 # hand calculation done from the report totals.)
 global_variations = {}
-global_ng_variations = {}
 solo_mes_anterior = []
 solo_mes_actual = []
 if prev_dfs:
@@ -436,12 +446,6 @@ if prev_dfs:
                           ignore_index=True)
     prev_kpis = compute_kpis(all_prev, kpi_defs)
     global_variations = compute_variation(global_kpis, prev_kpis)
-
-    # Same comparison but excluding Gipfel skills, for the "sin Gipfel" slide
-    prev_ng = all_prev[~all_prev["_skill"].str.lower().isin(GIPFEL_SKILLS)]
-    if global_ng_kpis is not None and len(prev_ng) > 0:
-        prev_ng_kpis = compute_kpis(prev_ng, kpi_defs)
-        global_ng_variations = compute_variation(global_ng_kpis, prev_ng_kpis)
 
 # Per-campaign KPIs + variations
 classification = {}
@@ -640,13 +644,6 @@ if len(daily_all) > 0:
     chart_images["daily_all"] = str(save_chart(fig, chart_dir / "daily_all.png"))
     plt.close(fig)
 
-# All no Gipfel
-daily_ng = aggregate_daily(all_no_gipfel)
-if len(daily_ng) > 0:
-    fig = chart_daily_distribution(daily_ng,
-                                    title="Distribuci\u00f3n diaria \u2014 Todas las campa\u00f1as (sin Gipfel)")
-    chart_images["daily_all_no_gipfel"] = str(save_chart(fig, chart_dir / "daily_ng.png"))
-    plt.close(fig)
 
 # Weekday
 if len(daily_all) > 0:
@@ -879,13 +876,6 @@ if generate_btn:
             "variations": fmt_var(global_variations),
             "chart_path": chart_images.get("daily_all", ""),
         })
-        if global_ng_kpis:
-            pptx_campaigns.append({
-                "name": "Todas las Campa\u00f1as (sin Gipfel)", "is_all": True,
-                "kpis": fmt(global_ng_kpis),
-                "variations": fmt_var(global_ng_variations),
-                "chart_path": chart_images.get("daily_all_no_gipfel", ""),
-            })
         for camp_name in CAMPAIGN_ORDER:
             if camp_name not in campaign_kpis:
                 continue
@@ -948,6 +938,8 @@ if generate_btn:
             monthly_trend=monthly_trend_data if monthly_trend_data else None,
             donut_footnote=donut_note,
             skills_reference=skills_ref,
+            resumen=ai_texts.get("resumen"),
+            conclusiones=ai_texts.get("conclusiones"),
         )
 
         # Same content, PDF layout

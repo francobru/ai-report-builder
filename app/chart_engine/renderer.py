@@ -194,38 +194,54 @@ def chart_horizontal_bars(
     labels: Sequence[str],
     recibidas: Sequence[float],
     atendidas: Sequence[float],
-    title: str = "Distribuci\u00f3n por campa\u00f1a",
+    title: str = "Distribucion por campana",
     *,
-    figsize: tuple[float, float] = (FIG_WIDTH, HBAR_FIG_HEIGHT),
+    figsize: tuple[float, float] | None = None,
+    label_size: int | None = None,
 ) -> plt.Figure:
-    """Horizontal paired bars: Recibidas (dark) and Atendidas (light)."""
+    """Horizontal paired bars: Recibidas (dark) and Atendidas (light).
+
+    The default proportion matches the box this chart lands in on the slide,
+    so it is placed at full size instead of being shrunk -- which was what
+    made the campaign names and figures hard to read.
+    """
+    if figsize is None:
+        figsize = (10.0, 7.4)          # ratio 1.35, same as the slide box
+    fs = label_size or 17
 
     y = np.arange(len(labels))
     fig, ax = plt.subplots(figsize=figsize)
 
-    bars_rec = ax.barh(y + BAR_WIDTH / 2, recibidas, BAR_WIDTH,
+    width = 0.38
+    bars_rec = ax.barh(y + width / 2, recibidas, width,
                        color=DARK_NAVY, label="Recibidas", zorder=3)
-    bars_att = ax.barh(y - BAR_WIDTH / 2, atendidas, BAR_WIDTH,
+    bars_att = ax.barh(y - width / 2, atendidas, width,
                        color=MEDIUM_BLUE, label="Atendidas", zorder=3)
 
     ax.set_yticks(y)
-    ax.set_yticklabels(labels, fontsize=LABEL_SIZE)
+    ax.set_yticklabels(labels, fontsize=fs)
     ax.invert_yaxis()
     ax.xaxis.set_major_formatter(mticker.FuncFormatter(_format_thousands))
+    ax.tick_params(axis="x", labelsize=fs - 3)
 
-    # Data labels
+    span = max(list(recibidas) + list(atendidas)) if len(recibidas) else 1
     for bars in (bars_rec, bars_att):
         for bar in bars:
             w = bar.get_width()
-            ax.text(w + max(recibidas) * 0.01, bar.get_y() + bar.get_height() / 2,
-                    _fmt_int(w), va="center", fontsize=ANNOTATION_SIZE, fontweight="bold")
+            ax.text(w + span * 0.015, bar.get_y() + bar.get_height() / 2,
+                    _fmt_int(w), va="center", fontsize=fs - 2, fontweight="bold")
 
-    ax.set_title(title, fontsize=TITLE_SIZE, fontweight="bold", loc="left", pad=12)
-    ax.xaxis.grid(True, alpha=0.3, linewidth=0.5, zorder=0)
+    ax.set_xlim(0, span * 1.20)
+    ax.set_title(title, fontsize=fs + 3, fontweight="bold", loc="left", pad=14)
+    ax.xaxis.grid(True, alpha=0.3, linewidth=0.6, zorder=0)
     ax.set_axisbelow(True)
-    ax.legend(loc="lower right", fontsize=LABEL_SIZE)
-
+    # The legend used to sit inside the axes and collided with the value
+    # label of the bottom bar. It now lives under the chart.
     fig.tight_layout()
+    fig.subplots_adjust(bottom=0.12)
+    fig.legend(*ax.get_legend_handles_labels(), loc="lower center",
+               bbox_to_anchor=(0.5, 0.005), ncol=2, frameon=False,
+               fontsize=fs - 2)
     return fig
 
 
