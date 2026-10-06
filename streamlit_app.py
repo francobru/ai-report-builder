@@ -69,7 +69,7 @@ masthead("Productividad del Contact Center",
 _scope_label = None
 
 # Version banner \u2014 lets you confirm at a glance which version is deployed
-APP_VERSION = "4.1"
+APP_VERSION = "4.2"
 st.caption(f"Versi\u00f3n {APP_VERSION} \u00b7 Contact Center y Plan M\u00e9dico \u00b7 hist\u00f3rico en archivo")
 
 with st.sidebar:
@@ -828,27 +828,20 @@ if _outbound_cache is not None:
     except Exception as e:
         st.error(f"Error al procesar llamadas salientes: {e}")
 
-# ---- Resumen ejecutivo y conclusiones ----
-# Built from the report's own figures: free, instant, nothing leaves the app
-# and no number can be invented.
-from app.ai_engine.summary_builder import build_executive_summary, build_conclusions
+# ---- Sintesis del periodo ----
+# A single bulleted block: the previous summary + conclusions pair repeated
+# the same figures.
+from app.ai_engine.summary_builder import build_executive_summary
 
 ai_texts = {}
-with st.expander("Resumen ejecutivo y conclusiones", expanded=True):
-    st.caption("Se arman con los numeros del propio reporte. Podes editarlos "
+with st.expander("S\u00edntesis del per\u00edodo", expanded=True):
+    st.caption("Se arma con los n\u00fameros del propio reporte. Pod\u00e9s editarla "
                "antes de generar el PPTX.")
-
-    _resumen = build_executive_summary(
-        current_period, global_kpis, global_variations, campaign_kpis, prev_period)
-    _conclusiones = build_conclusions(
-        current_period, global_kpis, global_variations, campaign_kpis, skill_kpis)
-
-    st.markdown("**Resumen ejecutivo**")
-    ai_texts["resumen"] = st.text_area("resumen", _resumen, height=130,
+    _sintesis = build_executive_summary(
+        current_period, global_kpis, global_variations, campaign_kpis,
+        prev_period, skill_kpis)
+    ai_texts["resumen"] = st.text_area("sintesis", _sintesis, height=230,
                                         label_visibility="collapsed")
-    st.markdown("**Conclusiones**")
-    ai_texts["conclusiones"] = st.text_area("conclusiones", _conclusiones, height=180,
-                                             label_visibility="collapsed")
 
 # Preview
 with st.expander("Vista previa de gr\u00e1ficos", expanded=False):
@@ -939,7 +932,6 @@ if generate_btn:
             donut_footnote=donut_note,
             skills_reference=skills_ref,
             resumen=ai_texts.get("resumen"),
-            conclusiones=ai_texts.get("conclusiones"),
         )
 
         # Same content, PDF layout

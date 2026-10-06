@@ -811,7 +811,6 @@ def generate_pptx_report(
     donut_footnote: str | None = None,
     skills_reference: list[dict[str, str]] | None = None,
     resumen: str | None = None,
-    conclusiones: str | None = None,
 ) -> bytes:
     """Generate a complete PPTX report and return it as bytes.
 
@@ -891,12 +890,6 @@ def generate_pptx_report(
                            chart_images["skill_volume_top10"], 0, period)
 
     _build_skill_table_slide(prs, skill_table, 0, period)
-
-    # Conclusions close the analysis, before the annexes.
-    if conclusiones:
-        _build_narrative_slide(prs, "Conclusiones",
-                               f"Lectura de los indicadores \u2014 {period}",
-                               conclusiones, period, accent=GREEN)
 
     for annex in annexes:
         _build_annex_daily_table(prs, annex["campaign_name"], annex["daily_rows"],

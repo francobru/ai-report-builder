@@ -38,123 +38,89 @@ def build_executive_summary(
     variations: dict[str, dict] | None = None,
     campaign_kpis: dict[str, dict] | None = None,
     previous_period: str | None = None,
-) -> str:
-    """Compose an executive summary from the KPI values."""
-    variations = variations or {}
-    campaign_kpis = campaign_kpis or {}
-
-    recibidas = kpis["recibidas"]["formatted"]
-    atendidas = kpis["atendidas"]["formatted"]
-    na = kpis["nivel_atencion"]["formatted"]
-    prom_rec = kpis["promedio_recibidas"]["formatted"]
-
-    parts: list[str] = []
-
-    # Opening: volume
-    opening = (f"Durante {period} el Contact Center recibi\u00f3 {recibidas} llamadas "
-               f"y atendi\u00f3 {atendidas}, alcanzando un nivel de atenci\u00f3n de {na}. "
-               f"El promedio diario de llamadas recibidas fue de {prom_rec}.")
-    parts.append(opening)
-
-    # Variation vs previous month
-    ref = previous_period or "el mes anterior"
-    var_rec = variations.get("recibidas")
-    var_na = variations.get("nivel_atencion")
-
-    if var_rec or var_na:
-        frases = []
-        if var_rec and var_rec.get("variation_pct") is not None:
-            verbo = _dir_word(var_rec, "aument\u00f3", "disminuy\u00f3")
-            frases.append(f"el volumen de llamadas recibidas {verbo} {_clean_pct(var_rec)} respecto a {ref}")
-        if var_na and var_na.get("variation_pct") is not None:
-            verbo = _dir_word(var_na, "mejor\u00f3", "descendi\u00f3")
-            frases.append(f"el nivel de atenci\u00f3n {verbo} {_clean_pct(var_na)}")
-        if frases:
-            texto = "En la comparaci\u00f3n mensual, " + " y ".join(frases)
-            parts.append(texto if texto.endswith(".") else texto + ".")
-
-    # Campaign with the highest volume
-    if campaign_kpis:
-        top = max(campaign_kpis.items(), key=lambda kv: kv[1]["recibidas"]["value"])
-        parts.append(f"La campa\u00f1a de mayor volumen fue {top[0]}, "
-                     f"con {top[1]['recibidas']['formatted']} llamadas recibidas y un nivel "
-                     f"de atenci\u00f3n de {top[1]['nivel_atencion']['formatted']}.")
-
-    return " ".join(parts)
-
-
-def build_conclusions(
-    period: str,
-    kpis: dict[str, dict],
-    variations: dict[str, dict] | None = None,
-    campaign_kpis: dict[str, dict] | None = None,
     skill_kpis: dict[str, dict] | None = None,
 ) -> str:
-    """Compose a bulleted conclusions block from the KPI values.
+    """One bulleted synthesis of the period.
 
-    No service-level target is assumed: none has been agreed yet, so the text
-    describes and ranks what happened instead of judging it against a number
-    that would be invented here.
+    Replaces the earlier prose summary plus a separate conclusions block:
+    the two repeated the same figures. Each bullet covers a different angle.
+    No service-level target is assumed -- none has been agreed -- so the
+    text describes and ranks instead of judging.
     """
     variations = variations or {}
     campaign_kpis = campaign_kpis or {}
     skill_kpis = skill_kpis or {}
-
+    ref = previous_period or "el mes anterior"
+    B = "\u2022 "
     lines: list[str] = []
 
-    # 1. Overall attention level, stated plainly
-    na_fmt = kpis["nivel_atencion"]["formatted"]
-    var_na = variations.get("nivel_atencion")
-    if var_na and var_na.get("variation_pct") is not None:
-        verbo = _dir_word(var_na, "mejor\u00f3", "descendi\u00f3", "se mantuvo estable")
-        lines.append(f"\u2022 El nivel de atenci\u00f3n general fue de {na_fmt} y {verbo} "
-                     f"{_clean_pct(var_na)} respecto al mes anterior.")
-    else:
-        lines.append(f"\u2022 El nivel de atenci\u00f3n general del per\u00edodo fue de {na_fmt}.")
+    lines.append(f"{B}Durante {period} se recibieron "
+                 f"{kpis['recibidas']['formatted']} llamadas y se atendieron "
+                 f"{kpis['atendidas']['formatted']}, con un nivel de atenci\u00f3n "
+                 f"de {kpis['nivel_atencion']['formatted']}.")
 
-    # 2. Volume trend
+    lines.append(f"{B}El promedio diario fue de "
+                 f"{kpis['promedio_recibidas']['formatted']} llamadas recibidas y "
+                 f"{kpis['promedio_atendidas']['formatted']} atendidas.")
+
     var_rec = variations.get("recibidas")
+    var_na = variations.get("nivel_atencion")
+    partes = []
     if var_rec and var_rec.get("variation_pct") is not None:
-        verbo = _dir_word(var_rec, "un incremento", "una reducci\u00f3n", "sin variaci\u00f3n")
-        lines.append(f"\u2022 El volumen de llamadas present\u00f3 {verbo} del "
-                     f"{_clean_pct(var_rec)} respecto al mes anterior.")
+        if var_rec.get("direction") == "neutral":
+            partes.append("el volumen de llamadas se mantuvo estable")
+        else:
+            verbo = _dir_word(var_rec, "aument\u00f3", "disminuy\u00f3")
+            partes.append(f"el volumen de llamadas {verbo} {_clean_pct(var_rec)}")
+    if var_na and var_na.get("variation_pct") is not None:
+        if var_na.get("direction") == "neutral":
+            partes.append("el nivel de atenci\u00f3n se mantuvo estable")
+        else:
+            verbo = _dir_word(var_na, "mejor\u00f3", "descendi\u00f3")
+            partes.append(f"el nivel de atenci\u00f3n {verbo} {_clean_pct(var_na)}")
+    # Both unchanged reads better as one phrase than "se mantuvo estable"
+    # repeated twice.
+    _quietos = (var_rec and var_rec.get("direction") == "neutral"
+                and var_na and var_na.get("direction") == "neutral")
+    if _quietos:
+        lines.append(f"{B}Respecto a {ref}, tanto el volumen de llamadas como el "
+                     f"nivel de atenci\u00f3n se mantuvieron estables.")
+    elif partes:
+        # "p.p." already ends in a period, so do not add a second one
+        texto = f"{B}Respecto a {ref}, " + " y ".join(partes)
+        lines.append(texto if texto.endswith(".") else texto + ".")
 
-    # 3. Spread between campaigns: the useful comparison without a target
-    if len(campaign_kpis) >= 2:
-        orden = sorted(campaign_kpis.items(),
-                       key=lambda kv: kv[1]["nivel_atencion"]["value"])
-        peor, mejor = orden[0], orden[-1]
-        lines.append(f"\u2022 El nivel de atenci\u00f3n vari\u00f3 entre {peor[1]['nivel_atencion']['formatted']} "
-                     f"({peor[0]}) y {mejor[1]['nivel_atencion']['formatted']} ({mejor[0]}).")
-    elif campaign_kpis:
-        c, k = next(iter(campaign_kpis.items()))
-        lines.append(f"\u2022 {c} registr\u00f3 un nivel de atenci\u00f3n de "
-                     f"{k['nivel_atencion']['formatted']}.")
-
-    # 4. Campaign carrying most of the volume
     if campaign_kpis:
         top = max(campaign_kpis.items(), key=lambda kv: kv[1]["recibidas"]["value"])
         total = sum(k["recibidas"]["value"] for k in campaign_kpis.values())
         share = (top[1]["recibidas"]["value"] / total * 100) if total else 0
-        lines.append(f"\u2022 {top[0]} concentr\u00f3 el {share:.0f}% de las llamadas recibidas "
-                     f"({top[1]['recibidas']['formatted']}).".replace(".0%", "%"))
+        lines.append(f"{B}{top[0]} concentr\u00f3 el {share:.0f}% del volumen "
+                     f"({top[1]['recibidas']['formatted']} llamadas recibidas).")
 
-    # 5. Skills with the lowest attention level, by volume relevance
-    if skill_kpis:
-        relevantes = [(s, k) for s, k in skill_kpis.items()
-                      if k["recibidas"]["value"] >= 100]
-        if len(relevantes) >= 5:
-            relevantes.sort(key=lambda kv: kv[1]["nivel_atencion"]["value"])
-            bajos = ", ".join(f"{s} ({k['nivel_atencion']['formatted']})"
-                              for s, k in relevantes[:3])
-            lines.append(f"\u2022 Las habilidades con menor nivel de atenci\u00f3n fueron: {bajos}.")
+    if len(campaign_kpis) >= 2:
+        orden = sorted(campaign_kpis.items(),
+                       key=lambda kv: kv[1]["nivel_atencion"]["value"])
+        peor, mejor = orden[0], orden[-1]
+        lines.append(f"{B}El nivel de atenci\u00f3n por campa\u00f1a vari\u00f3 entre "
+                     f"{peor[1]['nivel_atencion']['formatted']} ({peor[0]}) y "
+                     f"{mejor[1]['nivel_atencion']['formatted']} ({mejor[0]}).")
 
-    # 6. Operational times
+    relevantes = [(sk, kk) for sk, kk in skill_kpis.items()
+                  if kk["recibidas"]["value"] >= 100]
+    if len(relevantes) >= 5:
+        relevantes.sort(key=lambda kv: kv[1]["nivel_atencion"]["value"])
+        detalle = ", ".join(f"{sk} ({kk['nivel_atencion']['formatted']})"
+                            for sk, kk in relevantes[:3])
+        lines.append(f"{B}Las habilidades con menor nivel de atenci\u00f3n fueron: "
+                     f"{detalle}.")
+
     conv = kpis.get("tiempo_conversacion", {}).get("formatted")
     dem = kpis.get("tiempo_demora", {}).get("formatted")
+    aba = kpis.get("tiempo_abandono", {}).get("formatted")
     if conv and dem:
-        lines.append(f"\u2022 Los tiempos operativos promedio fueron de {conv} de conversaci\u00f3n "
-                     f"y {dem} de demora.")
+        extra = f" y {aba} de abandono" if aba else ""
+        lines.append(f"{B}Los tiempos promedio fueron de {conv} de conversaci\u00f3n, "
+                     f"{dem} de demora{extra}.")
 
     return "\n".join(lines)
 
