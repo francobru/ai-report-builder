@@ -69,7 +69,7 @@ masthead("Productividad del Contact Center",
 _scope_label = None
 
 # Version banner \u2014 lets you confirm at a glance which version is deployed
-APP_VERSION = "4.2"
+APP_VERSION = "4.2.1"
 st.caption(f"Versi\u00f3n {APP_VERSION} \u00b7 Contact Center y Plan M\u00e9dico \u00b7 hist\u00f3rico en archivo")
 
 with st.sidebar:
