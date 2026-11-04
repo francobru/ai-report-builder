@@ -1,0 +1,58 @@
+[
+  {
+    "year": 2026,
+    "month": 1,
+    "month_name": "Enero",
+    "recibidas": 79134,
+    "atendidas": 73033,
+    "nivel_atencion": 92.3
+  },
+  {
+    "year": 2026,
+    "month": 2,
+    "month_name": "Febrero",
+    "recibidas": 77037,
+    "atendidas": 67275,
+    "nivel_atencion": 87.3
+  },
+  {
+    "year": 2026,
+    "month": 3,
+    "month_name": "Marzo",
+    "recibidas": 87251,
+    "atendidas": 80068,
+    "nivel_atencion": 91.8
+  },
+  {
+    "year": 2026,
+    "month": 4,
+    "month_name": "Abril",
+    "recibidas": 83699,
+    "atendidas": 73880,
+    "nivel_atencion": 88.3
+  },
+  {
+    "year": 2026,
+    "month": 5,
+    "month_name": "Mayo",
+    "recibidas": 77530,
+    "atendidas": 69740,
+    "nivel_atencion": 90.0
+  },
+  {
+    "year": 2026,
+    "month": 10,
+    "month_name": "Octubre",
+    "recibidas": 79679,
+    "atendidas": 71354,
+    "nivel_atencion": 89.5
+  },
+  {
+    "year": 2026,
+    "month": 9,
+    "month_name": "Septiembre",
+    "recibidas": 83769,
+    "atendidas": 75069,
+    "nivel_atencion": 89.6
+  }
+]

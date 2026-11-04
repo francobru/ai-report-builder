@@ -7,8 +7,10 @@ Cambios v1.9:
 - Anexos con tablas diarias por campa\u00f1a
 """
 
+import io
 import sys
 import tempfile
+import zipfile
 from pathlib import Path
 
 import streamlit as st
@@ -27,7 +29,7 @@ from app.data_loader.skill_mapper import (
 from app.kpi_engine.calculator import compute_kpis, compute_variation
 from app.chart_engine.renderer import (
     chart_daily_distribution, chart_donut,
-    chart_grouped_bar_line, chart_horizontal_bars,
+    chart_grouped_bar_line, chart_horizontal_bars, chart_skill_top10,
     chart_vertical_bars, chart_outbound_results, chart_outbound_daily,
     save_chart,
 )
@@ -39,6 +41,74 @@ apply_global_style()
 plugin = ContactCenterPlugin()
 schema = plugin.get_schema()
 kpi_defs = plugin.get_kpis()
+
+# ======================================================================
+# ZIP support
+# ======================================================================
+# Twenty loose CSVs mean twenty separate uploads, and a corporate proxy
+# that drops one of them surfaces as "AxiosError: status code 500" on that
+# file. A ZIP is a single request: the whole month travels together or not
+# at all. Both ways of uploading stay available.
+
+_LIMITE_ZIP_MB = 120
+
+
+class _CSVDeZip(io.BytesIO):
+    """A CSV taken out of a ZIP, with the interface Streamlit files have."""
+
+    def __init__(self, nombre: str, datos: bytes) -> None:
+        super().__init__(datos)
+        self.name = nombre
+        self.size = len(datos)
+
+
+def _nombre_interno(info: zipfile.ZipInfo) -> str:
+    """Name of the entry, without folders and with its accents intact."""
+    crudo = info.filename
+    # Windows Explorer stores names in cp437 unless it sets the UTF-8 flag.
+    # Without this, a skill written "Plan Medico" with an accent arrives
+    # mangled and stops matching its campaign.
+    if not info.flag_bits & 0x800:
+        try:
+            crudo = crudo.encode("cp437").decode("utf-8")
+        except (UnicodeDecodeError, UnicodeEncodeError):
+            pass
+    return Path(crudo.replace("\\", "/")).name
+
+
+def expandir_zips(archivos):
+    """Flat list of CSVs: ZIPs get opened, loose CSVs pass through."""
+    salida = []
+    for f in archivos:
+        if not f.name.lower().endswith(".zip"):
+            salida.append(f)
+            continue
+        try:
+            f.seek(0)
+            with zipfile.ZipFile(io.BytesIO(f.read())) as z:
+                if sum(i.file_size for i in z.infolist()) > _LIMITE_ZIP_MB * 1024 * 1024:
+                    st.error(
+                        f"{f.name} supera los {_LIMITE_ZIP_MB} MB descomprimido. "
+                        f"Divid\u00edlo en dos o sub\u00ed los CSV sueltos.")
+                    continue
+                hallados = 0
+                for info in z.infolist():
+                    if info.is_dir() or "__MACOSX" in info.filename:
+                        continue
+                    nombre = _nombre_interno(info)
+                    # Hidden files and Mac metadata are not data
+                    if nombre.startswith(".") or not nombre.lower().endswith(".csv"):
+                        continue
+                    salida.append(_CSVDeZip(nombre, z.read(info)))
+                    hallados += 1
+                if hallados == 0:
+                    st.warning(
+                        f"{f.name} no contiene ning\u00fan CSV. Fijate que hayas "
+                        f"comprimido los archivos y no una carpeta vac\u00eda.")
+        except zipfile.BadZipFile:
+            st.error(f"No pude abrir {f.name}: no es un ZIP v\u00e1lido o lleg\u00f3 "
+                     f"incompleto. Prob\u00e1 subirlo de nuevo.")
+    return salida
 
 # ======================================================================
 # Page config
@@ -69,7 +139,7 @@ masthead("Productividad del Contact Center",
 _scope_label = None
 
 # Version banner \u2014 lets you confirm at a glance which version is deployed
-APP_VERSION = "4.2.1"
+APP_VERSION = "4.4"
 st.caption(f"Versi\u00f3n {APP_VERSION} \u00b7 Contact Center y Plan M\u00e9dico \u00b7 hist\u00f3rico en archivo")
 
 with st.sidebar:
@@ -119,14 +189,18 @@ _barra_progreso(_paso)
 # ======================================================================
 if _paso == 1:
 
+    st.caption("Pod\u00e9s subir los CSV sueltos, o un \u00fanico ZIP con todos los del mes "
+               "adentro. El ZIP viaja en una sola subida, as\u00ed que es m\u00e1s r\u00e1pido y "
+               "evita que se caiga alg\u00fan archivo por el camino.")
+
     col_cur, col_prev = st.columns(2)
     with col_cur:
         st.markdown("**Mes actual** \u00b7 obligatorio")
-        st.file_uploader("CSVs del mes a reportar", type=["csv"],
+        st.file_uploader("CSVs o ZIP del mes a reportar", type=["csv", "zip"],
                          accept_multiple_files=True, key="current")
     with col_prev:
         st.markdown("**Mes anterior** \u00b7 opcional, para comparar")
-        st.file_uploader("CSVs del mes anterior", type=["csv"],
+        st.file_uploader("CSVs o ZIP del mes anterior", type=["csv", "zip"],
                          accept_multiple_files=True, key="previous")
 
     st.markdown("**Llamadas salientes** \u00b7 opcional, archivo aparte")
@@ -147,7 +221,7 @@ if _paso == 1:
     _cache = st.session_state.get("archivos")
     _nombres_now = [f.name for f in _cur]
 
-    if _cur and _nombres_now != (_cache or {}).get("nombres"):
+    if _cur and _nombres_now != (_cache or {}).get("nombres_subidos"):
         st.session_state.pop("archivos", None)          # a new upload replaces it
         _cache = None
 
@@ -194,13 +268,16 @@ def load_file_set(uploaded_files):
 
 # The uploaders only exist on step 1, so the parsed data is cached here and
 # reused from step 2 onwards.
-current_files = st.session_state.get("current") or []
-previous_files = st.session_state.get("previous") or []
+_subidos_cur = st.session_state.get("current") or []
+_subidos_prev = st.session_state.get("previous") or []
 outbound_file = st.session_state.get("outbound")
 history_file = st.session_state.get("history")
 
 if "archivos" not in st.session_state:
     with st.spinner("Leyendo los archivos..."):
+        # A ZIP arrives as one file and holds the month's CSVs inside
+        current_files = expandir_zips(_subidos_cur)
+        previous_files = expandir_zips(_subidos_prev)
         _cur_dfs, _cur_per = load_file_set(current_files)
         _prev_dfs, _prev_per = (({}, None) if not previous_files
                                 else load_file_set(previous_files))
@@ -221,6 +298,9 @@ if "archivos" not in st.session_state:
         "prev": _prev_dfs, "prev_period": _prev_per,
         "nombres": [f.name for f in current_files],
         "nombres_prev": [f.name for f in previous_files],
+        # What the user actually picked (a ZIP, or the loose CSVs). Used to
+        # tell a new upload apart from a rerun of the same one.
+        "nombres_subidos": [f.name for f in _subidos_cur],
         "outbound": _ob,
         "historico": _hi,
         "historico_aplicado": False,
@@ -685,11 +765,10 @@ if len(camp_sorted) > 1:
 # Skill top 10
 top_skills = sorted(skill_kpis.items(), key=lambda x: -x[1]["recibidas"]["value"])[:10]
 if top_skills:
-    fig = chart_horizontal_bars(
+    fig = chart_skill_top10(
         [s[0] for s in top_skills],
         [s[1]["recibidas"]["value"] for s in top_skills],
-        [s[1]["atendidas"]["value"] for s in top_skills],
-        title="Top 10 habilidades por volumen de llamadas recibidas")
+        [s[1]["atendidas"]["value"] for s in top_skills])
     chart_images["skill_volume_top10"] = str(save_chart(fig, chart_dir / "skill_top10.png"))
     plt.close(fig)
 
@@ -737,9 +816,12 @@ if _period_info:
     # month the user never generated a report for (or one lost when the server
     # restarted, since its storage is temporary) leaves a hole in the trend.
     if prev_dfs:
+        # Read from the cached names: the uploader widget only exists on
+        # step 1, so by the time the report is built its file list is gone,
+        # and the previous month was silently missing from the history.
         _prev_info = None
-        for uf in previous_files:
-            _prev_info = _extract_period_full(uf.name)
+        for _nom in _arch.get("nombres_prev") or []:
+            _prev_info = _extract_period_full(_nom)
             if _prev_info:
                 break
         if _prev_info:

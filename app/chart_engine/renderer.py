@@ -37,6 +37,8 @@ from app.chart_engine.chart_styles import (
     OUTBOUND_BAR,
     SMALL_FIG_HEIGHT,
     SMALL_FIG_WIDTH,
+    TEXT_DARK,
+    TEXT_GRAY,
     TICK_SIZE,
     TITLE_SIZE,
     WHITE,
@@ -242,6 +244,92 @@ def chart_horizontal_bars(
     fig.legend(*ax.get_legend_handles_labels(), loc="lower center",
                bbox_to_anchor=(0.5, 0.005), ncol=2, frameon=False,
                fontsize=fs - 2)
+    return fig
+
+
+def chart_skill_top10(
+    labels: Sequence[str],
+    recibidas: Sequence[float],
+    atendidas: Sequence[float],
+    *,
+    figsize: tuple[float, float] | None = None,
+    label_size: int | None = None,
+    mostrar_na: bool = True,
+) -> plt.Figure:
+    """Top-10 skills: Recibidas (dark) ON TOP of its Atendidas (light).
+
+    That is the order the pair is read in -- how many came in, and how many
+    of those were answered -- so the bars follow it.
+
+    Two pieces of white space are put to work. The slide already carries the
+    chart's title, so the strip it used to take becomes bar height. And the
+    right margin, empty because the axis always rounds up past the longest
+    bar, carries each row's attention level: the figure the reader is after
+    the moment two bars of different length are in front of them.
+
+    chart_horizontal_bars above keeps the older layout, and the campaign
+    slide keeps using it.
+    """
+    if figsize is None:
+        figsize = (10.0, 7.4)          # ratio 1.35, same as the slide box
+    fs = label_size or 17
+
+    y = np.arange(len(labels))
+    fig, ax = plt.subplots(figsize=figsize)
+
+    width = 0.42
+    # The y axis grows downwards, so SUBTRACTING half a bar moves it up.
+    bars_rec = ax.barh(y - width / 2, recibidas, width,
+                       color=DARK_NAVY, label="Recibidas", zorder=3)
+    bars_att = ax.barh(y + width / 2, atendidas, width,
+                       color=MEDIUM_BLUE, label="Atendidas", zorder=3)
+
+    ax.set_yticks(y)
+    ax.set_yticklabels(labels, fontsize=fs)
+    # Inverted, with room at the top for the attention-level heading
+    # Headroom for the heading strip above the first bar
+    ax.set_ylim(len(labels) - 0.45, -1.05)
+    ax.xaxis.set_major_formatter(mticker.FuncFormatter(_format_thousands))
+    ax.xaxis.set_major_locator(mticker.MaxNLocator(5))
+    ax.tick_params(axis="x", labelsize=fs - 4, colors=TEXT_GRAY)
+    ax.tick_params(axis="y", length=0, pad=6)
+
+    span = max(list(recibidas) + list(atendidas)) if len(recibidas) else 1
+    # Recibidas reads first (bold, dark); Atendidas supports it (light grey)
+    for bars, color, peso in ((bars_rec, TEXT_DARK, "bold"),
+                              (bars_att, TEXT_GRAY, "normal")):
+        for bar in bars:
+            w = bar.get_width()
+            ax.text(w + span * 0.012, bar.get_y() + bar.get_height() / 2,
+                    _fmt_int(w), va="center", fontsize=fs - 3,
+                    fontweight=peso, color=color)
+
+    if mostrar_na:
+        col_na = span * 1.30
+        ax.axvline(span * 1.22, color="#D5DBE2", lw=1.2, zorder=1,
+                   ymin=0.02, ymax=0.99)
+        ax.text(col_na, -1.25, "NIVEL DE\nATENCI\u00d3N", ha="center", va="bottom",
+                fontsize=fs - 6, color=TEXT_GRAY, fontweight="bold",
+                linespacing=1.3)
+        for i, (r, a) in enumerate(zip(recibidas, atendidas)):
+            pct = (a / r * 100) if r else 0
+            ax.text(col_na, i, f"{pct:.1f}".replace(".", ",") + "%",
+                    ha="center", va="center", fontsize=fs - 2,
+                    fontweight="bold", color=TEXT_DARK)
+
+    ax.set_xlim(0, span * (1.38 if mostrar_na else 1.17))
+    ax.xaxis.grid(True, alpha=0.25, linewidth=0.6, zorder=0)
+    ax.set_axisbelow(True)
+    for lado in ("top", "right", "left"):
+        ax.spines[lado].set_visible(False)
+    # The legend goes in the strip above the first bar. The gap the short
+    # bars leave at the bottom looked tempting, but a month where every
+    # skill has a similar volume leaves no gap at all and the legend lands
+    # on top of the figures.
+    ax.legend(loc="lower left", bbox_to_anchor=(0.0, 1.0), ncol=2,
+              frameon=False, fontsize=fs - 2, handlelength=1.1,
+              handleheight=1.0, columnspacing=1.4)
+    fig.tight_layout()
     return fig
 
 
